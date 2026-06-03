@@ -1,0 +1,251 @@
+// packages/db/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── IDENTIDADE ──────────────────────────────────────────────────────────────
+
+/// Cadastro único global — independente do tenant.
+/// CPF opcional para suportar casos cross-tenant (professor Inst.B sem CPF matriculado na Inst.A).
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  /// Hash Argon2 — nunca texto plano
+  passwordHash String
+  name         String
+  /// Opcional: vínculo cross-tenant é feito por email; CPF pode ser complementado depois
+  cpf          String?  @unique
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships TenantMembership[]
+  auditLogs   AuditLog[]
+  onboarding  UserOnboarding[]
+
+  @@index([email])
+}
+
+/// Vínculo entre usuário, tenant e papel.
+/// Um usuário pode ter múltiplos vínculos (ex: professor Inst.B + aluno Inst.A).
+model TenantMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  /// 'inst_a' | 'inst_b' — expansível para novos tenants
+  tenantId  String
+  role      Role
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId, role])
+  @@index([tenantId, role])
+  @@index([userId, tenantId])
+}
+
+enum Role {
+  ALUNO
+  PROFESSOR
+  COORDENADOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+// ─── EAD ─────────────────────────────────────────────────────────────────────
+
+model Course {
+  id          String       @id @default(cuid())
+  tenantId    String
+  slug        String
+  title       String
+  description String?
+  status      CourseStatus @default(DRAFT)
+  hoursTotal  Int          @default(0)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  modules     Module[]
+  enrollments Enrollment[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Module {
+  id    String @id @default(cuid())
+  courseId String
+  title    String
+  /// Posição para ordenação drag-and-drop
+  position Int
+  /// ID do módulo que deve estar concluído antes de desbloquear este
+  prerequisiteId String?
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@index([courseId, position])
+}
+
+model Lesson {
+  id       String     @id @default(cuid())
+  moduleId String
+  title    String
+  type     LessonType
+  position Int
+  /// Para tipo VIDEO: ID interno — videoId do YouTube resolvido server-side, nunca exposto ao client
+  videoRef String?
+  /// Para tipo PDF: chave no Cloudflare R2
+  fileKey  String?
+  /// Para tipo TEXT: conteúdo rico em markdown/html
+  content  String?
+  /// Para tipo LINK: URL externa
+  url      String?
+  duration Int? // segundos
+
+  module   Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress LessonProgress[]
+
+  @@index([moduleId, position])
+}
+
+enum LessonType {
+  VIDEO
+  PDF
+  TEXT
+  LINK
+  LIVE
+}
+
+model Enrollment {
+  id        String           @id @default(cuid())
+  userId    String
+  courseId  String
+  tenantId  String
+  status    EnrollmentStatus @default(ACTIVE)
+  expiresAt DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  course   Course           @relation(fields: [courseId], references: [id])
+  progress LessonProgress[]
+
+  @@unique([userId, courseId])
+  @@index([tenantId, status])
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+}
+
+model LessonProgress {
+  id           String    @id @default(cuid())
+  enrollmentId String
+  lessonId     String
+  completed    Boolean   @default(false)
+  completedAt  DateTime?
+  /// Segundos assistidos — para marcar conclusão automática por tempo
+  watchedSecs  Int       @default(0)
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+}
+
+// ─── PAGE BUILDER ─────────────────────────────────────────────────────────────
+
+/// Layout de página editado pelo page builder.
+/// blocks é um JSON array de LayoutBlock[] — validado na API via Zod, nunca no banco.
+model PageLayout {
+  id        String    @id @default(cuid())
+  tenantId  String
+  /// 'home' | 'course' | 'login' | 'certificate' | custom
+  pageType  String
+  version   Int
+  blocks    Json
+  /// null = rascunho não publicado
+  publishedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+  updatedBy   String
+
+  @@index([tenantId, pageType, version])
+  @@index([tenantId, pageType, publishedAt])
+}
+
+// ─── CERTIFICADOS ─────────────────────────────────────────────────────────────
+
+/// Certificado emitido ao concluir um curso.
+/// O código único é usado para validação pública em /certificado/{code}.
+model Certificate {
+  id           String   @id @default(cuid())
+  tenantId     String
+  userId       String
+  courseId     String
+  enrollmentId String
+  /// Código alfanumérico único para validação pública — gerado com crypto.randomUUID()
+  code         String   @unique
+  /// Chave no R2 onde o PDF está armazenado
+  pdfKey       String?
+  issuedAt     DateTime @default(now())
+
+  @@index([tenantId, userId])
+  @@index([code])
+}
+
+// ─── AUDITORIA ────────────────────────────────────────────────────────────────
+
+/// Log imutável de ações relevantes. Nunca deletar registros — apenas arquivar.
+model AuditLog {
+  id       String  @id @default(cuid())
+  tenantId String
+  userId   String
+  /// Ex: 'enrollment.create', 'layout.publish', 'lesson.access', 'user.login'
+  action   String
+  /// Ex: 'enrollment:cuid123'
+  resource String?
+  /// Dados adicionais da ação em JSON livre
+  meta     Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, action, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ─── ONBOARDING ──────────────────────────────────────────────────────────────
+
+/// Rastreia quais tours o usuário já completou ou pulou.
+/// Persistido no banco (não em cookie) para funcionar entre dispositivos.
+model UserOnboarding {
+  id          String    @id @default(cuid())
+  userId      String
+  tourId      String
+  completed   Boolean   @default(false)
+  skipped     Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tourId])
+  @@index([userId])
+}
