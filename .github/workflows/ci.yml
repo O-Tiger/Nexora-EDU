@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Prisma Client precisa ser gerado antes do typecheck — os tipos
+      # (enums, InputJsonValue, etc.) só existem depois deste passo.
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        working-directory: packages/db
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: "postgresql://postgres:dev@localhost:5432/nexora_dev"
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: "http://localhost:3000"
+          NEXT_PUBLIC_BRAND_NAME: "Nexora EDU"
+          NEXT_PUBLIC_BRAND_TAGLINE: "Educação sem fronteiras"

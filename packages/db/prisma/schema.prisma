@@ -1,0 +1,352 @@
+// packages/db/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── IDENTIDADE ──────────────────────────────────────────────────────────────
+
+/// Cadastro único global — independente do tenant.
+/// CPF opcional para suportar casos cross-tenant (professor Inst.B sem CPF matriculado na Inst.A).
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  /// Hash Argon2 — nunca texto plano
+  passwordHash String
+  name         String
+  /// Opcional: vínculo cross-tenant é feito por email; CPF pode ser complementado depois
+  cpf          String?  @unique
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships TenantMembership[]
+  auditLogs   AuditLog[]
+  onboarding  UserOnboarding[]
+
+  @@index([email])
+}
+
+/// Vínculo entre usuário, tenant e papel.
+/// Um usuário pode ter múltiplos vínculos (ex: professor Inst.B + aluno Inst.A).
+model TenantMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  /// 'inst_a' | 'inst_b' — expansível para novos tenants
+  tenantId  String
+  role      Role
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId, role])
+  @@index([tenantId, role])
+  @@index([userId, tenantId])
+}
+
+enum Role {
+  ALUNO
+  PROFESSOR
+  COORDENADOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+// ─── EAD ─────────────────────────────────────────────────────────────────────
+
+model Course {
+  id          String       @id @default(cuid())
+  tenantId    String
+  slug        String
+  title       String
+  description String?
+  status      CourseStatus @default(DRAFT)
+  hoursTotal  Int          @default(0)
+  /// false = curso de Teste (pode ser excluído em cascata); true = Oficial (exclusão bloqueada)
+  isOfficial  Boolean      @default(false)
+  /// Fórmula da nota final ponderando as avaliações (ex: "(p1*0.4)+(p2*0.6)").
+  /// Avaliada com mathjs — NUNCA eval. Variáveis vêm de Assessment.formulaVar.
+  gradeFormula String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  modules     Module[]
+  enrollments Enrollment[]
+  assessments Assessment[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, status])
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Module {
+  id    String @id @default(cuid())
+  courseId String
+  title    String
+  /// Posição para ordenação drag-and-drop
+  position Int
+  /// ID do módulo que deve estar concluído antes de desbloquear este
+  prerequisiteId String?
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@index([courseId, position])
+}
+
+model Lesson {
+  id       String     @id @default(cuid())
+  moduleId String
+  title    String
+  type     LessonType
+  position Int
+  /// Para tipo VIDEO: ID interno — videoId do YouTube resolvido server-side, nunca exposto ao client
+  videoRef String?
+  /// Para tipo PDF: chave no Cloudflare R2
+  fileKey  String?
+  /// Para tipo TEXT: conteúdo rico em markdown/html
+  content  String?
+  /// Para tipo LINK: URL externa
+  url      String?
+  duration Int? // segundos
+
+  module   Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress LessonProgress[]
+
+  @@index([moduleId, position])
+}
+
+enum LessonType {
+  VIDEO
+  PDF
+  TEXT
+  LINK
+  LIVE
+}
+
+model Enrollment {
+  id        String           @id @default(cuid())
+  userId    String
+  courseId  String
+  tenantId  String
+  status    EnrollmentStatus @default(ACTIVE)
+  expiresAt DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  course   Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress LessonProgress[]
+
+  @@unique([userId, courseId])
+  @@index([tenantId, status])
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+}
+
+model LessonProgress {
+  id           String    @id @default(cuid())
+  enrollmentId String
+  lessonId     String
+  completed    Boolean   @default(false)
+  completedAt  DateTime?
+  /// Segundos assistidos — para marcar conclusão automática por tempo
+  watchedSecs  Int       @default(0)
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  lesson     Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, lessonId])
+}
+
+// ─── AVALIAÇÕES ──────────────────────────────────────────────────────────────
+
+model Assessment {
+  id           String           @id @default(cuid())
+  tenantId     String
+  courseId     String
+  /// Módulo ao qual a avaliação pertence (opcional)
+  moduleId     String?
+  title        String
+  description  String?
+  status       AssessmentStatus @default(DRAFT)
+  /// Nota mínima de aprovação, na mesma escala da soma de pontos das questões
+  passingScore Float            @default(6)
+  /// Tentativas máximas permitidas ao aluno
+  maxAttempts  Int              @default(1)
+  dueAt        DateTime?
+  /// Nome da variável desta avaliação na fórmula de nota final (ex: "p1")
+  formulaVar   String?
+  /// Quando esta avaliação é a recuperação de outra
+  recoveryOfId String?          @unique
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  recoveryOf  Assessment?  @relation("Recovery", fields: [recoveryOfId], references: [id])
+  recovery    Assessment?  @relation("Recovery")
+  questions   Question[]
+  submissions Submission[]
+
+  @@index([tenantId, courseId])
+  @@index([courseId, status])
+}
+
+enum AssessmentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Question {
+  id           String       @id @default(cuid())
+  assessmentId String
+  type         QuestionType
+  /// Enunciado da questão (texto/markdown)
+  prompt       String
+  /// Peso da questão na nota da avaliação
+  points       Float        @default(1)
+  position     Int
+  /// MULTIPLE_CHOICE: array de { id, text }
+  options      Json?
+  /// Gabarito: MC = id(s) da opção; TRUE_FALSE = boolean; ESSAY = null (correção manual)
+  correctAnswer Json?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, position])
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  ESSAY
+}
+
+model Submission {
+  id           String           @id @default(cuid())
+  tenantId     String
+  assessmentId String
+  enrollmentId String
+  attempt      Int              @default(1)
+  status       SubmissionStatus @default(IN_PROGRESS)
+  /// Respostas do aluno: { [questionId]: resposta }
+  answers      Json
+  /// Arquivos entregues (chaves de storage): string[]
+  fileKeys     Json?
+  /// Nota final após correção (auto + dissertativas)
+  score        Float?
+  gradedAt     DateTime?
+  gradedBy     String?
+  createdAt    DateTime         @default(now())
+  submittedAt  DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, enrollmentId, attempt])
+  @@index([tenantId, assessmentId])
+  @@index([enrollmentId])
+}
+
+enum SubmissionStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+}
+
+// ─── PAGE BUILDER ─────────────────────────────────────────────────────────────
+
+/// Layout de página editado pelo page builder.
+/// blocks é um JSON array de LayoutBlock[] — validado na API via Zod, nunca no banco.
+model PageLayout {
+  id        String    @id @default(cuid())
+  tenantId  String
+  /// 'home' | 'course' | 'login' | 'certificate' | custom
+  pageType  String
+  version   Int
+  blocks    Json
+  /// null = rascunho não publicado
+  publishedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+  updatedBy   String
+
+  @@index([tenantId, pageType, version])
+  @@index([tenantId, pageType, publishedAt])
+}
+
+// ─── CERTIFICADOS ─────────────────────────────────────────────────────────────
+
+/// Certificado emitido ao concluir um curso.
+/// O código único é usado para validação pública em /certificado/{code}.
+model Certificate {
+  id           String   @id @default(cuid())
+  tenantId     String
+  userId       String
+  courseId     String
+  enrollmentId String
+  /// Código alfanumérico único para validação pública — gerado com crypto.randomUUID()
+  code         String   @unique
+  /// Chave no R2 onde o PDF está armazenado
+  pdfKey       String?
+  issuedAt     DateTime @default(now())
+
+  @@index([tenantId, userId])
+  @@index([code])
+}
+
+// ─── AUDITORIA ────────────────────────────────────────────────────────────────
+
+/// Log imutável de ações relevantes. Nunca deletar registros — apenas arquivar.
+model AuditLog {
+  id       String  @id @default(cuid())
+  tenantId String
+  userId   String
+  /// Ex: 'enrollment.create', 'layout.publish', 'lesson.access', 'user.login'
+  action   String
+  /// Ex: 'enrollment:cuid123'
+  resource String?
+  /// Dados adicionais da ação em JSON livre
+  meta     Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, action, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ─── ONBOARDING ──────────────────────────────────────────────────────────────
+
+/// Rastreia quais tours o usuário já completou ou pulou.
+/// Persistido no banco (não em cookie) para funcionar entre dispositivos.
+model UserOnboarding {
+  id          String    @id @default(cuid())
+  userId      String
+  tourId      String
+  completed   Boolean   @default(false)
+  skipped     Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tourId])
+  @@index([userId])
+}

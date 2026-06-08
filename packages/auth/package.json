@@ -1,0 +1,25 @@
+{
+  "name": "@nexora/auth",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nexora/db": "*",
+    "@upstash/ratelimit": "^2.0.0",
+    "@upstash/redis": "^1.34.0",
+    "next-auth": "^5.0.0-beta.20",
+    "argon2": "^0.41.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": "^20.0.0",
+    "next": "^15.0.0"
+  },
+  "peerDependencies": {
+    "next": "^15.0.0"
+  }
+}
