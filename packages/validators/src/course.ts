@@ -9,6 +9,7 @@ export const CreateCourseSchema = z.object({
     .regex(/^[a-z0-9-]+$/, "Slug deve conter apenas letras minúsculas, números e hífens"),
   description: z.string().max(2000).optional(),
   hoursTotal: z.number().int().min(0).max(9999).default(0),
+  isOfficial: z.boolean().default(false),
 });
 
 export const UpdateCourseSchema = CreateCourseSchema.partial();

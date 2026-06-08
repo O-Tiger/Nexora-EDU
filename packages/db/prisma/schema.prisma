@@ -68,6 +68,8 @@ model Course {
   description String?
   status      CourseStatus @default(DRAFT)
   hoursTotal  Int          @default(0)
+  /// false = curso de Teste (pode ser excluído em cascata); true = Oficial (exclusão bloqueada)
+  isOfficial  Boolean      @default(false)
   /// Fórmula da nota final ponderando as avaliações (ex: "(p1*0.4)+(p2*0.6)").
   /// Avaliada com mathjs — NUNCA eval. Variáveis vêm de Assessment.formulaVar.
   gradeFormula String?
@@ -143,7 +145,7 @@ model Enrollment {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  course   Course           @relation(fields: [courseId], references: [id])
+  course   Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
   progress LessonProgress[]
 
   @@unique([userId, courseId])

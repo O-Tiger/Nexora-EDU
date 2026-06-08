@@ -35,7 +35,7 @@ export async function getCourseById(tenantId: string, id: string) {
 
 export async function createCourse(
   tenantId: string,
-  data: { title: string; slug: string; description?: string; hoursTotal?: number },
+  data: { title: string; slug: string; description?: string; hoursTotal?: number; isOfficial?: boolean },
 ) {
   return prisma.course.create({ data: { tenantId, ...data } });
 }
@@ -43,13 +43,34 @@ export async function createCourse(
 export async function updateCourse(
   tenantId: string,
   id: string,
-  data: Partial<{ title: string; slug: string; description: string; hoursTotal: number; status: CourseStatus }>,
+  data: Partial<{ title: string; slug: string; description: string; hoursTotal: number; status: CourseStatus; isOfficial: boolean }>,
 ) {
   return prisma.course.update({ where: { id, tenantId }, data });
 }
 
 export async function deleteCourse(tenantId: string, id: string) {
   return prisma.course.delete({ where: { id, tenantId } });
+}
+
+/**
+ * Exclusão em cascata de um curso de TESTE: remove certificados (que não têm FK)
+ * e depois o curso — cujo delete cascateia matrículas (→ progresso), módulos
+ * (→ aulas) e avaliações (→ questões/submissões). Tudo numa transação.
+ */
+export async function deleteCourseCascade(tenantId: string, id: string) {
+  return prisma.$transaction([
+    prisma.certificate.deleteMany({ where: { tenantId, courseId: id } }),
+    prisma.course.delete({ where: { id, tenantId } }),
+  ]);
+}
+
+/** userIds dos alunos com matrícula ativa no curso — para avisos de descontinuação. */
+export async function getEnrolledUserIds(tenantId: string, courseId: string): Promise<string[]> {
+  const rows = await prisma.enrollment.findMany({
+    where: { tenantId, courseId, status: "ACTIVE" },
+    select: { userId: true },
+  });
+  return [...new Set(rows.map((r) => r.userId))];
 }
 
 export async function reorderModules(
