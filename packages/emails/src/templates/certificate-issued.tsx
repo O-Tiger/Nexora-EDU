@@ -1,5 +1,4 @@
 import { Button, Heading, Section, Text } from "@react-email/components";
-import * as React from "react";
 import { BaseLayout } from "../layouts/base";
 
 interface Props {
@@ -13,7 +12,7 @@ interface Props {
 
 export function CertificateIssuedEmail({ studentName, courseName, certificateCode, validationUrl, downloadUrl, institutionName }: Props) {
   return (
-    <BaseLayout preview={`Parabéns! Seu certificado de ${courseName} está pronto`} institutionName={institutionName}>
+    <BaseLayout preview={`Parabéns! Seu certificado de ${courseName} está pronto`} {...(institutionName !== undefined && { institutionName })}>
       <Heading style={{ fontSize: 24, color: "#1A3A5C", marginBottom: 8 }}>
         Parabéns, você concluiu o curso!
       </Heading>

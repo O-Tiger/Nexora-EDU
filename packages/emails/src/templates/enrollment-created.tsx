@@ -1,5 +1,4 @@
 import { Button, Heading, Section, Text } from "@react-email/components";
-import * as React from "react";
 import { BaseLayout } from "../layouts/base";
 
 interface Props {
@@ -12,7 +11,7 @@ interface Props {
 
 export function EnrollmentCreatedEmail({ studentName, courseName, expiresAt, courseUrl, institutionName }: Props) {
   return (
-    <BaseLayout preview={`Você foi matriculado em ${courseName}`} institutionName={institutionName}>
+    <BaseLayout preview={`Você foi matriculado em ${courseName}`} {...(institutionName !== undefined && { institutionName })}>
       <Heading style={{ fontSize: 24, color: "#1A3A5C", marginBottom: 8 }}>
         Sua matrícula foi confirmada
       </Heading>

@@ -1,5 +1,4 @@
 import { Button, Heading, Section, Text } from "@react-email/components";
-import * as React from "react";
 import { BaseLayout } from "../layouts/base";
 
 interface Props {
@@ -13,7 +12,7 @@ interface Props {
 
 export function EnrollmentExpiringEmail({ studentName, courseName, expiresAt, daysLeft, renewUrl, institutionName }: Props) {
   return (
-    <BaseLayout preview={`Sua matrícula em ${courseName} expira em ${daysLeft} dias`} institutionName={institutionName}>
+    <BaseLayout preview={`Sua matrícula em ${courseName} expira em ${daysLeft} dias`} {...(institutionName !== undefined && { institutionName })}>
       <Heading style={{ fontSize: 24, color: "#1A3A5C", marginBottom: 8 }}>
         Sua matrícula está prestes a expirar
       </Heading>

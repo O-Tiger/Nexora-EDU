@@ -7,11 +7,11 @@ import {
   Hr,
   Text,
 } from "@react-email/components";
-import * as React from "react";
+import type { ReactNode } from "react";
 
 interface BaseLayoutProps {
   preview: string;
-  children: React.ReactNode;
+  children: ReactNode;
   institutionName?: string;
 }
 
