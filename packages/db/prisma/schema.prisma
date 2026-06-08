@@ -68,11 +68,15 @@ model Course {
   description String?
   status      CourseStatus @default(DRAFT)
   hoursTotal  Int          @default(0)
+  /// Fórmula da nota final ponderando as avaliações (ex: "(p1*0.4)+(p2*0.6)").
+  /// Avaliada com mathjs — NUNCA eval. Variáveis vêm de Assessment.formulaVar.
+  gradeFormula String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   modules     Module[]
   enrollments Enrollment[]
+  assessments Assessment[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -168,6 +172,101 @@ model LessonProgress {
   lesson     Lesson     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
   @@unique([enrollmentId, lessonId])
+}
+
+// ─── AVALIAÇÕES ──────────────────────────────────────────────────────────────
+
+model Assessment {
+  id           String           @id @default(cuid())
+  tenantId     String
+  courseId     String
+  /// Módulo ao qual a avaliação pertence (opcional)
+  moduleId     String?
+  title        String
+  description  String?
+  status       AssessmentStatus @default(DRAFT)
+  /// Nota mínima de aprovação, na mesma escala da soma de pontos das questões
+  passingScore Float            @default(6)
+  /// Tentativas máximas permitidas ao aluno
+  maxAttempts  Int              @default(1)
+  dueAt        DateTime?
+  /// Nome da variável desta avaliação na fórmula de nota final (ex: "p1")
+  formulaVar   String?
+  /// Quando esta avaliação é a recuperação de outra
+  recoveryOfId String?          @unique
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  recoveryOf  Assessment?  @relation("Recovery", fields: [recoveryOfId], references: [id])
+  recovery    Assessment?  @relation("Recovery")
+  questions   Question[]
+  submissions Submission[]
+
+  @@index([tenantId, courseId])
+  @@index([courseId, status])
+}
+
+enum AssessmentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Question {
+  id           String       @id @default(cuid())
+  assessmentId String
+  type         QuestionType
+  /// Enunciado da questão (texto/markdown)
+  prompt       String
+  /// Peso da questão na nota da avaliação
+  points       Float        @default(1)
+  position     Int
+  /// MULTIPLE_CHOICE: array de { id, text }
+  options      Json?
+  /// Gabarito: MC = id(s) da opção; TRUE_FALSE = boolean; ESSAY = null (correção manual)
+  correctAnswer Json?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, position])
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  ESSAY
+}
+
+model Submission {
+  id           String           @id @default(cuid())
+  tenantId     String
+  assessmentId String
+  enrollmentId String
+  attempt      Int              @default(1)
+  status       SubmissionStatus @default(IN_PROGRESS)
+  /// Respostas do aluno: { [questionId]: resposta }
+  answers      Json
+  /// Arquivos entregues (chaves de storage): string[]
+  fileKeys     Json?
+  /// Nota final após correção (auto + dissertativas)
+  score        Float?
+  gradedAt     DateTime?
+  gradedBy     String?
+  createdAt    DateTime         @default(now())
+  submittedAt  DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, enrollmentId, attempt])
+  @@index([tenantId, assessmentId])
+  @@index([enrollmentId])
+}
+
+enum SubmissionStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
 }
 
 // ─── PAGE BUILDER ─────────────────────────────────────────────────────────────
