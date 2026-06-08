@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { verify } from "argon2";
 import { getUserByEmail } from "@nexora/db/src/queries/users";
@@ -29,7 +29,10 @@ declare module "next-auth" {
   }
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+// Separar config com `satisfies` e desabilitar `declaration` no tsconfig resolve
+// TS2742/TS2883 — o tipo de `auth` referencia internals do NextAuth que não são
+// portáveis quando declaration:true tenta emitir .d.ts.
+const authConfig = {
   providers: [
     Credentials({
       credentials: {
@@ -84,7 +87,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt" as const },
   callbacks: {
     jwt({ token, user }) {
       if (user) {
@@ -122,4 +125,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   // Access token: 8h; refresh via httpOnly cookie é gerenciado pelo NextAuth v5
   jwt: { maxAge: 8 * 60 * 60 },
-});
+} satisfies NextAuthConfig;
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
