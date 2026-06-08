@@ -1,5 +1,8 @@
 import { prisma } from "../client";
+import { PrismaClient } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
+
+type Tx = Parameters<Parameters<InstanceType<typeof PrismaClient>["$transaction"]>[0]>[0];
 
 // Modelo de versionamento:
 //   - Rascunho   = linha com publishedAt = null e version = 0 (no máximo 1 por página).
@@ -83,7 +86,7 @@ export async function publishBlocks(
   blocks: Blocks,
   userId: string,
 ) {
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Tx) => {
     const max = await tx.pageLayout.aggregate({
       where: { tenantId, pageType, publishedAt: { not: null } },
       _max: { version: true },
@@ -116,7 +119,7 @@ export async function publishBlocks(
         tenantId,
         pageType,
         publishedAt: { not: null },
-        id: { notIn: keep.map((k) => k.id) },
+        id: { notIn: keep.map((k: { id: string }) => k.id) },
       },
     });
 

@@ -14,7 +14,7 @@ export async function createModule(
   });
 
   return prisma.module.create({
-    data: { courseId, title: data.title, position: (maxPos._max.position ?? 0) + 1, prerequisiteId: data.prerequisiteId },
+    data: { courseId, title: data.title, position: (maxPos._max.position ?? 0) + 1, prerequisiteId: data.prerequisiteId ?? null },
   });
 }
 

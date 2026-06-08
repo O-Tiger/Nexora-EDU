@@ -70,7 +70,7 @@ export async function getEnrolledUserIds(tenantId: string, courseId: string): Pr
     where: { tenantId, courseId, status: "ACTIVE" },
     select: { userId: true },
   });
-  return [...new Set(rows.map((r) => r.userId))];
+  return [...new Set(rows.map((r: { userId: string }) => r.userId))];
 }
 
 export async function reorderModules(
