@@ -25,7 +25,7 @@ function genId() {
 type State = { toasts: ToastData[] };
 type Action =
   | { type: "ADD"; toast: ToastData }
-  | { type: "DISMISS"; toastId?: string }
+  | { type: "DISMISS"; toastId?: string | undefined }
   | { type: "REMOVE"; toastId?: string };
 
 const listeners: Array<(state: State) => void> = [];
