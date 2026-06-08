@@ -4,7 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import { getCourseById } from "@nexora/db/src/queries/courses";
 import { Button } from "@nexora/ui";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileCheck2 } from "lucide-react";
 import { CourseForm } from "@/components/admin/course-form";
 import { CourseModulesEditor } from "@/components/admin/course-modules-editor";
 import { CourseActions } from "@/components/admin/course-actions";
@@ -31,6 +31,11 @@ export default async function CourseEditPage({ params }: { params: Promise<{ id:
           <h1 className="text-2xl font-bold text-navy-900">{course.title}</h1>
           <p className="text-sm text-navy-500">/{course.slug}</p>
         </div>
+        <Button variant="secondary" asChild>
+          <Link href={`/admin/cursos/${course.id}/avaliacoes` as never}>
+            <FileCheck2 className="h-4 w-4" /> Avaliações
+          </Link>
+        </Button>
         <CourseActions course={{ id: course.id, status: course.status }} />
       </div>
 

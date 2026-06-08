@@ -9,6 +9,14 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 2 — Avaliações)
+- `packages/db`: models `Assessment`, `Question`, `Submission` (+ enums) e `Course.gradeFormula`; queries de avaliações e submissões com auto-correção
+- `packages/validators`: schemas Zod de avaliação, questão (MC/V-F/dissertativa) e respostas
+- `apps/web`: avaliador de fórmula de nota com `mathjs` seguro (sanitização + allowlist, nunca `eval`) e preview
+- `apps/web`: upload de entregas validado por MIME + magic bytes + limite por tipo (`FileUploadZone` reutilizável)
+- `apps/web`: autoria de avaliações (`/admin/cursos/[id]/avaliacoes`), questões, fórmula de nota e correção de dissertativas
+- `apps/web`: aluno responde avaliações (`/aluno/avaliacoes`) com auto-correção de objetivas e auditoria de submissão/correção
+
 ### Added (Fase 2 — Page Builder)
 - `packages/validators`: schemas Zod de blocos do Page Builder (hero, richText, featureGrid, courseList, cta, image, spacer) com hrefs/cores seguros + `PageBlocks`/`PageType`
 - `packages/db`: queries de layout (`saveDraft`, `publishBlocks` com versionamento e poda de 10, `rollbackToVersion`) + helper de auditoria (`createAuditLog`, `getAuditLogs`)

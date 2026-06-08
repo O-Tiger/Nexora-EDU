@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Home, LogOut, Menu, X } from "lucide-react";
+import { BookOpen, Home, LogOut, Menu, X, FileCheck2 } from "lucide-react";
 import { cn, Button, BRAND } from "@nexora/ui";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
@@ -15,6 +15,7 @@ const tenantLabels: Record<string, string> = {
 const navItems = [
   { href: "/aluno", label: "Início", icon: Home, exact: true },
   { href: "/aluno/cursos", label: "Meus Cursos", icon: BookOpen },
+  { href: "/aluno/avaliacoes", label: "Avaliações", icon: FileCheck2 },
 ];
 
 export function StudentSidebar({ user }: { user: { name: string; tenantId: string } }) {
