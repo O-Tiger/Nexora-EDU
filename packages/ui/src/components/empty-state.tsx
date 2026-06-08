@@ -6,10 +6,8 @@ interface EmptyStateProps {
   icon?: React.ReactNode;
   title: string;
   description?: string;
-  action?: {
-    label: string;
-    onClick: () => void;
-  };
+  /** Use `href` para Server Components; `onClick` para Client Components. */
+  action?: { label: string; href: string; onClick?: never } | { label: string; onClick: () => void; href?: never };
   className?: string;
 }
 
@@ -31,9 +29,15 @@ export function EmptyState({ icon, title, description, action, className }: Empt
         <p className="mb-4 max-w-sm text-sm text-navy-500">{description}</p>
       )}
       {action && (
-        <Button onClick={action.onClick} size="sm">
-          {action.label}
-        </Button>
+        action.href ? (
+          <Button size="sm" asChild>
+            <a href={action.href}>{action.label}</a>
+          </Button>
+        ) : (
+          <Button onClick={action.onClick} size="sm">
+            {action.label}
+          </Button>
+        )
       )}
     </div>
   );

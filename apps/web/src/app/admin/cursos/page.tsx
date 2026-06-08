@@ -45,7 +45,7 @@ export default async function CoursesPage() {
           icon={<BookOpen className="h-6 w-6" />}
           title="Nenhum curso ainda"
           description="Crie seu primeiro curso para começar a publicar conteúdo."
-          action={{ label: "Criar curso", onClick: () => {} }}
+          action={{ label: "Criar curso", href: "/admin/cursos/novo" }}
         />
       ) : (
         <div className="rounded-lg border border-navy-100 bg-white">
