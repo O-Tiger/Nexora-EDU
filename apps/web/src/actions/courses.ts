@@ -5,9 +5,13 @@ import {
   createCourse,
   updateCourse,
   deleteCourse,
+  deleteCourseCascade,
+  getEnrolledUserIds,
   reorderModules,
   reorderLessons,
 } from "@nexora/db/src/queries/courses";
+import { prisma } from "@nexora/db";
+import { createAuditLog } from "@nexora/db/src/queries/audit";
 import {
   createModule,
   updateModule,
@@ -40,6 +44,7 @@ export async function createCourseAction(formData: FormData) {
     slug: formData.get("slug"),
     description: formData.get("description") ?? undefined,
     hoursTotal: Number(formData.get("hoursTotal") ?? 0),
+    isOfficial: formData.get("isOfficial") === "true",
   };
 
   const parsed = CreateCourseSchema.safeParse(raw);
@@ -60,6 +65,7 @@ export async function updateCourseAction(id: string, formData: FormData) {
     slug: formData.get("slug") ?? undefined,
     description: formData.get("description") ?? undefined,
     hoursTotal: formData.get("hoursTotal") ? Number(formData.get("hoursTotal")) : undefined,
+    isOfficial: formData.has("isOfficial") ? formData.get("isOfficial") === "true" : undefined,
   };
 
   const parsed = UpdateCourseSchema.safeParse(raw);
@@ -81,15 +87,50 @@ export async function publishCourseAction(id: string) {
 }
 
 export async function archiveCourseAction(id: string) {
-  const { tenantId } = await requireAdmin();
+  const { tenantId, userId } = await requireAdmin();
+  const course = await prisma.course.findFirst({
+    where: { id, tenantId },
+    select: { isOfficial: true, title: true },
+  });
+  if (!course) return { error: "Curso não encontrado" };
+
   await updateCourse(tenantId, id, { status: "ARCHIVED" });
+
+  // Curso oficial sendo descontinuado: registra aviso aos alunos matriculados.
+  // Trilha persistente em AuditLog — pronta para plugar WhatsApp/e-mail (sendWhatsApp ainda é stub).
+  if (course.isOfficial) {
+    const userIds = await getEnrolledUserIds(tenantId, id);
+    await Promise.all(
+      userIds.map((studentId) =>
+        createAuditLog(tenantId, studentId, "course.discontinued", `course:${id}`, {
+          courseTitle: course.title,
+          archivedBy: userId,
+        }),
+      ),
+    );
+  }
+
   revalidatePath("/admin/cursos");
+  return { success: true };
 }
 
 export async function deleteCourseAction(id: string) {
-  const { tenantId } = await requireAdmin();
-  await deleteCourse(tenantId, id);
+  const { tenantId, userId } = await requireAdmin();
+  const course = await prisma.course.findFirst({
+    where: { id, tenantId },
+    select: { isOfficial: true, title: true },
+  });
+  if (!course) return { error: "Curso não encontrado" };
+
+  // Cursos oficiais nunca são excluídos — evita perda de dados de produção.
+  if (course.isOfficial) {
+    return { error: "Cursos oficiais não podem ser excluídos. Arquive-o (os alunos serão avisados)." };
+  }
+
+  await deleteCourseCascade(tenantId, id);
+  await createAuditLog(tenantId, userId, "course.delete", `course:${id}`, { courseTitle: course.title });
   revalidatePath("/admin/cursos");
+  return { success: true };
 }
 
 // ─── Módulos ──────────────────────────────────────────────────────────────────

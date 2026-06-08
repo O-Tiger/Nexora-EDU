@@ -7,17 +7,23 @@ import { publishCourseAction, archiveCourseAction, deleteCourseAction } from "@/
 import type { CourseStatus } from "@nexora/db";
 
 interface Props {
-  course: { id: string; status: CourseStatus };
+  course: { id: string; status: CourseStatus; isOfficial: boolean };
 }
+
+type ActionResult = { error?: string; success?: boolean } | void;
 
 export function CourseActions({ course }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  function confirmAndRun(message: string, action: () => Promise<void>) {
+  function confirmAndRun(message: string, action: () => Promise<ActionResult>) {
     if (!confirm(message)) return;
     startTransition(async () => {
-      await action();
+      const result = await action();
+      if (result && "error" in result && result.error) {
+        toast({ variant: "destructive", title: "Não foi possível", description: result.error });
+        return;
+      }
       router.refresh();
     });
   }
@@ -44,31 +50,42 @@ export function CourseActions({ course }: Props) {
           variant="outline"
           disabled={isPending}
           onClick={() =>
-            confirmAndRun("Arquivar este curso? Ele não ficará mais visível para novos alunos.", () =>
-              archiveCourseAction(course.id),
+            confirmAndRun(
+              course.isOfficial
+                ? "Arquivar este curso oficial? Ele sairá do ar para novos alunos e os matriculados serão avisados."
+                : "Arquivar este curso? Ele não ficará mais visível para novos alunos.",
+              () => archiveCourseAction(course.id),
             )
           }
         >
           Arquivar
         </Button>
       )}
-      <Button
-        size="sm"
-        variant="destructive"
-        disabled={isPending}
-        onClick={() =>
-          confirmAndRun(
-            `Excluir permanentemente "${course.id}"? Esta ação não pode ser desfeita e removerá todos os módulos e aulas.`,
-            async () => {
-              await deleteCourseAction(course.id);
+      {course.isOfficial ? (
+        <Button size="sm" variant="destructive" disabled title="Cursos oficiais não podem ser excluídos — arquive-os">
+          Excluir
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={isPending}
+          onClick={() => {
+            if (!confirm("Excluir este curso de TESTE? Esta ação é irreversível e remove em cascata matrículas, progresso, certificados e submissões.")) return;
+            startTransition(async () => {
+              const r = await deleteCourseAction(course.id);
+              if (r && "error" in r && r.error) {
+                toast({ variant: "destructive", title: "Não foi possível", description: r.error });
+                return;
+              }
               toast({ variant: "success", title: "Curso excluído" });
               router.push("/admin/cursos");
-            },
-          )
-        }
-      >
-        Excluir
-      </Button>
+            });
+          }}
+        >
+          Excluir
+        </Button>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ interface CourseFormProps {
     slug: string;
     description: string | null;
     hoursTotal: number;
+    isOfficial: boolean;
   };
 }
 
@@ -118,6 +119,22 @@ export function CourseForm({ course }: CourseFormProps) {
               defaultValue={course?.hoursTotal ?? 0}
               className="max-w-[160px]"
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="isOfficial">Tipo do curso</Label>
+            <select
+              id="isOfficial"
+              name="isOfficial"
+              defaultValue={course?.isOfficial ? "true" : "false"}
+              className="h-10 max-w-[220px] rounded-md border border-navy-200 bg-white px-3 text-sm text-navy-800"
+            >
+              <option value="false">Teste (pode ser excluído)</option>
+              <option value="true">Oficial (exclusão bloqueada)</option>
+            </select>
+            <p className="text-xs text-navy-400">
+              Cursos de teste podem ser excluídos em cascata. Oficiais só podem ser arquivados — e os alunos matriculados são avisados.
+            </p>
           </div>
 
           <div className="flex gap-3 sm:justify-end">

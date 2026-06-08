@@ -36,7 +36,7 @@ export default async function CourseEditPage({ params }: { params: Promise<{ id:
             <FileCheck2 className="h-4 w-4" /> Avaliações
           </Link>
         </Button>
-        <CourseActions course={{ id: course.id, status: course.status }} />
+        <CourseActions course={{ id: course.id, status: course.status, isOfficial: course.isOfficial }} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -48,6 +48,7 @@ export default async function CourseEditPage({ params }: { params: Promise<{ id:
               slug: course.slug,
               description: course.description,
               hoursTotal: course.hoursTotal,
+              isOfficial: course.isOfficial,
             }}
           />
         </div>
