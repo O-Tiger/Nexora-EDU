@@ -4,7 +4,6 @@ import { auth } from "@nexora/auth";
 import {
   createCourse,
   updateCourse,
-  deleteCourse,
   deleteCourseCascade,
   getEnrolledUserIds,
   reorderModules,

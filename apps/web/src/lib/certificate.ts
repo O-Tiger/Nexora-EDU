@@ -1,5 +1,4 @@
 import { prisma } from "@nexora/db";
-import { buildFileKey } from "./r2";
 
 // Puppeteer carregado dinamicamente — não incluir no bundle do client
 async function getPuppeteer() {

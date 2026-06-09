@@ -4,8 +4,6 @@ import { redirect } from "next/navigation";
 import { getEnrollmentsByTenant } from "@nexora/db/src/queries/enrollments-admin";
 import { prisma } from "@nexora/db";
 import {
-  Badge,
-  Button,
   EmptyState,
   Table,
   TableBody,

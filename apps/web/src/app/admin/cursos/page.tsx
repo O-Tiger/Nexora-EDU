@@ -3,7 +3,6 @@ import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import { getCourses } from "@nexora/db/src/queries/courses";
 import {
-  Badge,
   Button,
   EmptyState,
   Table,
