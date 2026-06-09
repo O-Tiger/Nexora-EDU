@@ -10,9 +10,12 @@ const nextConfig: NextConfig = {
     },
   },
   webpack(config) {
-    // Suprimir warnings de dynamic require do OpenTelemetry (vem do Sentry)
     config.ignoreWarnings = [
+      // Dynamic require do OpenTelemetry (vem do Sentry)
       { module: /@opentelemetry\/instrumentation/ },
+      // jose usa CompressionStream/DecompressionStream (Node-only) mas o middleware
+      // só usa getToken (Edge-safe) — este warning é transitivo e inofensivo.
+      { module: /jose\/dist\/webapi\/lib\/deflate/ },
     ];
     return config;
   },
