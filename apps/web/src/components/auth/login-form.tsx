@@ -66,7 +66,7 @@ export function LoginForm() {
     const available = session?.user?.availableTenants ?? [];
 
     if (available.length <= 1) {
-      router.push(callbackUrl);
+      router.push(callbackUrl as never);
       router.refresh();
       return;
     }
@@ -94,7 +94,7 @@ export function LoginForm() {
       return;
     }
 
-    router.push(callbackUrl);
+    router.push(callbackUrl as never);
     router.refresh();
   }
 

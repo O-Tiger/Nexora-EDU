@@ -84,7 +84,7 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
 
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath,
+    ...(executablePath !== undefined && { executablePath }),
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 

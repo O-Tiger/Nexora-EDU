@@ -89,7 +89,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ enrollm
     }
 
     // Sem R2 configurado: retornar o PDF inline (apenas em dev)
-    return new Response(pdfBuffer, {
+    return new Response(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="certificado-${certificate.code}.pdf"`,
