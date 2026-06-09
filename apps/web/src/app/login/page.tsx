@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { LoginForm } from "@/components/auth/login-form";
 import { BRAND } from "@nexora/ui";
 
@@ -12,7 +13,10 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-navy-900">{BRAND.name}</h1>
           <p className="mt-1 text-sm text-navy-500">{BRAND.tagline}</p>
         </div>
-        <LoginForm />
+        {/* Suspense necessário porque LoginForm usa useSearchParams() */}
+        <Suspense>
+          <LoginForm />
+        </Suspense>
       </div>
     </div>
   );

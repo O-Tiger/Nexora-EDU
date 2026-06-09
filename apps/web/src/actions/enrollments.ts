@@ -43,11 +43,12 @@ export async function enrollUserAction(formData: FormData) {
   if (!user) return { error: "Aluno não encontrado neste tenant" };
   if (!course) return { error: "Curso não encontrado" };
 
+  const expiresAtDate = expiresAt ? new Date(expiresAt) : undefined;
   await enrollUser({
     userId,
     courseId,
     tenantId,
-    expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+    ...(expiresAtDate !== undefined && { expiresAt: expiresAtDate }),
   });
 
   revalidatePath("/admin/matriculas");

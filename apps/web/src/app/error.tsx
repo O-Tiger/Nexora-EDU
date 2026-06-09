@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { Button } from "@nexora/ui";
 
 export default function GlobalError({
@@ -25,7 +26,7 @@ export default function GlobalError({
       <div className="flex gap-3">
         <Button onClick={reset}>Tentar novamente</Button>
         <Button variant="outline" asChild>
-          <a href="/">Voltar ao início</a>
+          <Link href="/">Voltar ao início</Link>
         </Button>
       </div>
       <p className="mt-6 text-sm text-navy-400">

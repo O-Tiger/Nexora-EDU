@@ -4,7 +4,6 @@ import { auth } from "@nexora/auth";
 import {
   createCourse,
   updateCourse,
-  deleteCourse,
   deleteCourseCascade,
   getEnrolledUserIds,
   reorderModules,
@@ -52,7 +51,11 @@ export async function createCourseAction(formData: FormData) {
     return { error: parsed.error.errors[0]?.message ?? "Dados inválidos" };
   }
 
-  const course = await createCourse(tenantId, parsed.data);
+  const { description, ...rest } = parsed.data;
+  const course = await createCourse(tenantId, {
+    ...rest,
+    ...(description !== undefined && { description }),
+  });
   revalidatePath("/admin/cursos");
   return { courseId: course.id };
 }
@@ -73,7 +76,10 @@ export async function updateCourseAction(id: string, formData: FormData) {
     return { error: parsed.error.errors[0]?.message ?? "Dados inválidos" };
   }
 
-  await updateCourse(tenantId, id, parsed.data);
+  const updateData = Object.fromEntries(
+    Object.entries(parsed.data).filter(([, v]) => v !== undefined),
+  ) as Parameters<typeof updateCourse>[2];
+  await updateCourse(tenantId, id, updateData);
   revalidatePath("/admin/cursos");
   revalidatePath(`/admin/cursos/${id}`);
   return { success: true };

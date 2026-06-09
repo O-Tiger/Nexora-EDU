@@ -119,9 +119,9 @@ export async function POST(req: Request) {
       await createLesson(activeTenantId, createdMod.id, {
         title: lesson.title,
         type: lesson.type,
-        content: lesson.content,
-        url: lesson.url,
-        fileKey: pdfFileKey,
+        ...(lesson.content !== undefined && { content: lesson.content }),
+        ...(lesson.url !== undefined && { url: lesson.url }),
+        ...(pdfFileKey !== undefined && { fileKey: pdfFileKey }),
       });
     }
   }

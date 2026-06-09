@@ -1,5 +1,4 @@
 import { prisma } from "@nexora/db";
-import { buildFileKey } from "./r2";
 
 // Puppeteer carregado dinamicamente — não incluir no bundle do client
 async function getPuppeteer() {
@@ -84,7 +83,7 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
 
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath,
+    ...(executablePath !== undefined && { executablePath }),
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 

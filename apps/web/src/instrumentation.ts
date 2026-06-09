@@ -1,8 +1,9 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { init } = await import("@sentry/nextjs");
+    const dsn = process.env.SENTRY_DSN;
     init({
-      dsn: process.env.SENTRY_DSN,
+      ...(dsn !== undefined && { dsn }),
       environment: process.env.NODE_ENV,
       tracesSampleRate: process.env.NODE_ENV === "production" ? 0.2 : 1.0,
       beforeSend(event) {
@@ -21,8 +22,9 @@ export async function register() {
 
   if (process.env.NEXT_RUNTIME === "edge") {
     const { init } = await import("@sentry/nextjs");
+    const dsn = process.env.SENTRY_DSN;
     init({
-      dsn: process.env.SENTRY_DSN,
+      ...(dsn !== undefined && { dsn }),
       environment: process.env.NODE_ENV,
       tracesSampleRate: 0,
     });
@@ -31,8 +33,8 @@ export async function register() {
 
 export const onRequestError = async (
   err: unknown,
-  request: { path: string; method: string },
-  context: { routerKind: string; routePath: string },
+  request: Parameters<typeof import("@sentry/nextjs")["captureRequestError"]>[1],
+  context: Parameters<typeof import("@sentry/nextjs")["captureRequestError"]>[2],
 ) => {
   const { captureRequestError } = await import("@sentry/nextjs");
   captureRequestError(err, request, context);

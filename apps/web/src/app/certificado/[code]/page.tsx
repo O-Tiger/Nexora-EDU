@@ -19,14 +19,6 @@ export default async function CertificateValidationPage({
 }) {
   const { code } = await params;
 
-  const cert = await prisma.certificate.findUnique({
-    where: { code: code.toUpperCase() },
-    include: {
-      // Buscar dados via joins manuais — sem relações declaradas no schema ainda
-    },
-  });
-
-  // Buscar manualmente user e course
   const certificate = await prisma.certificate.findUnique({ where: { code: code.toUpperCase() } });
   if (!certificate) notFound();
 

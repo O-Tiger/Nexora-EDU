@@ -168,7 +168,9 @@ async function processItem(
 
     case "weblink": {
       const url = await extractWebLinkUrl(entries, href);
-      return { title: lessonTitle, type: "LINK", url: url ?? undefined };
+      return url != null
+        ? { title: lessonTitle, type: "LINK", url }
+        : { title: lessonTitle, type: "TEXT", content: "<p><em>Link não disponível.</em></p>" };
     }
 
     case "lti": {
@@ -187,7 +189,9 @@ async function processItem(
           url = href;
         }
       }
-      return { title: lessonTitle, type: "LINK", url };
+      return url != null
+        ? { title: lessonTitle, type: "LINK", url }
+        : { title: lessonTitle, type: "TEXT", content: "<p><em>Ferramenta externa não disponível.</em></p>" };
     }
 
     case "quiz": {
@@ -268,7 +272,7 @@ async function walkItems(
       // Container: fecha o grupo de folhas atual e desce um nível
       flush();
       const title = (item.title as string) || inheritedTitle || "";
-      await walkItems(toArray(item.item), resourceMap, entries, files, title, modules);
+      await walkItems(toArray(item.item) as Record<string, unknown>[], resourceMap, entries, files, title, modules);
     }
   }
   flush();
