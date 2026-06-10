@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Button, Input, Textarea, Label, toast } from "@nexora/ui";
 import { Plus, Trash2, Eye, EyeOff } from "lucide-react";
 import { createKnowledgeAction, updateKnowledgeAction, deleteKnowledgeAction } from "@/actions/communication";
+import { useConfirm } from "@/hooks/use-confirm";
 
 interface Entry {
   id: string;
@@ -18,6 +19,7 @@ export function KnowledgeEditor({ initial }: Props) {
   const [entries, setEntries] = useState<Entry[]>(initial);
   const [form, setForm] = useState({ question: "", answer: "" });
   const [isPending, startTransition] = useTransition();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   function add() {
     if (!form.question.trim() || !form.answer.trim()) return;
@@ -39,14 +41,15 @@ export function KnowledgeEditor({ initial }: Props) {
     });
   }
 
-  function remove(id: string) {
-    if (!confirm("Excluir esta entrada?")) return;
+  async function remove(id: string) {
+    if (!await confirm({ title: "Excluir entrada", description: "Excluir esta entrada da base de conhecimento?", confirmLabel: "Excluir", confirmVariant: "destructive" })) return;
     setEntries((prev) => prev.filter((e) => e.id !== id));
     startTransition(() => deleteKnowledgeAction(id));
   }
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog />
       <div className="rounded-lg border border-navy-100 bg-white p-4 space-y-3">
         <p className="text-sm font-medium text-navy-800">Nova entrada</p>
         <div className="space-y-1">

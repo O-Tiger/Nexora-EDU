@@ -8,6 +8,7 @@ import {
   updateLiveSessionAction,
   setRecordingAction,
 } from "@/actions/live-sessions";
+import { useConfirm } from "@/hooks/use-confirm";
 
 interface Session {
   id: string;
@@ -51,6 +52,7 @@ export function LiveSessionManager({ courseId, lessonId, lessonTitle, session: i
   });
   const [recordingUrl, setRecordingUrl] = useState(initial?.recordingUrl ?? "");
   const [isPending, startTransition] = useTransition();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   function create() {
     startTransition(async () => {
@@ -79,10 +81,10 @@ export function LiveSessionManager({ courseId, lessonId, lessonTitle, session: i
     });
   }
 
-  function changeStatus(status: "LIVE" | "ENDED" | "CANCELLED") {
+  async function changeStatus(status: "LIVE" | "ENDED" | "CANCELLED") {
     if (!session) return;
     const label = status === "LIVE" ? "Iniciar a aula ao vivo" : status === "ENDED" ? "Encerrar a aula" : "Cancelar a sessão";
-    if (!confirm(`${label}?`)) return;
+    if (!await confirm({ description: `${label}?`, confirmLabel: "Confirmar", confirmVariant: status === "CANCELLED" ? "destructive" : "default" })) return;
 
     startTransition(async () => {
       const r = await updateLiveSessionAction(courseId, session.id, { status });
@@ -104,6 +106,7 @@ export function LiveSessionManager({ courseId, lessonId, lessonTitle, session: i
 
   return (
     <div className="rounded-lg border border-navy-100 bg-white p-4 space-y-4">
+      <ConfirmDialog />
       <div className="flex items-center gap-2">
         <Video className="h-4 w-4 text-teal-600" />
         <h3 className="font-medium text-navy-900">Aula ao vivo</h3>

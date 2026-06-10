@@ -35,6 +35,7 @@ import type { LayoutBlock, BlockType } from "@nexora/validators";
 import { BLOCK_LABELS, BLOCK_PALETTE, makeBlock } from "./block-meta";
 import { BlockView } from "./block-view";
 import { saveDraftAction, publishLayoutAction, rollbackLayoutAction } from "@/actions/layouts";
+import { useConfirm } from "@/hooks/use-confirm";
 
 interface VersionRow {
   id: string;
@@ -56,6 +57,7 @@ export function PageBuilderEditor({ pageType, initialBlocks, source, versions }:
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [dirty, setDirty] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -99,8 +101,8 @@ export function PageBuilderEditor({ pageType, initialBlocks, source, versions }:
     });
   }
 
-  function publish() {
-    if (!confirm("Publicar esta versão? Ela ficará visível na página pública.")) return;
+  async function publish() {
+    if (!await confirm({ title: "Publicar página", description: "Publicar esta versão? Ela ficará visível na página pública.", confirmLabel: "Publicar" })) return;
     startTransition(async () => {
       const r = await publishLayoutAction(pageType, blocks);
       if (r?.error) {
@@ -112,8 +114,8 @@ export function PageBuilderEditor({ pageType, initialBlocks, source, versions }:
     });
   }
 
-  function rollback(version: number) {
-    if (!confirm(`Restaurar a versão ${version}? Ela será republicada como nova versão.`)) return;
+  async function rollback(version: number) {
+    if (!await confirm({ title: "Restaurar versão", description: `Restaurar a versão ${version}? Ela será republicada como nova versão.`, confirmLabel: "Restaurar" })) return;
     startTransition(async () => {
       const r = await rollbackLayoutAction(pageType, version);
       if (r?.error) {
@@ -126,6 +128,7 @@ export function PageBuilderEditor({ pageType, initialBlocks, source, versions }:
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog />
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-navy-100 bg-white p-3">
         <div className="flex rounded-md border border-navy-100 p-0.5">

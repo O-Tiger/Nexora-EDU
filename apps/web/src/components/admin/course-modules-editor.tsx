@@ -21,6 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, toast } from "@nexora/ui";
 import Link from "next/link";
 import { GripVertical, Plus, Trash2, ChevronDown, ChevronRight, Video } from "lucide-react";
+import { useConfirm } from "@/hooks/use-confirm";
 import {
   createModuleAction,
   deleteModuleAction,
@@ -43,6 +44,7 @@ export function CourseModulesEditor({ courseId, modules: initialModules }: Props
   const [newModuleTitle, setNewModuleTitle] = useState("");
   const [isPending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<Set<string>>(new Set(initialModules.map((m) => m.id)));
+  const [ConfirmDialog, confirm] = useConfirm();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -81,8 +83,8 @@ export function CourseModulesEditor({ courseId, modules: initialModules }: Props
     });
   }
 
-  function removeModule(moduleId: string) {
-    if (!confirm("Excluir este módulo e todas as suas aulas?")) return;
+  async function removeModule(moduleId: string) {
+    if (!await confirm({ title: "Excluir módulo", description: "Excluir este módulo e todas as suas aulas?", confirmLabel: "Excluir", confirmVariant: "destructive" })) return;
     setModules((prev) => prev.filter((m) => m.id !== moduleId));
     startTransition(() => deleteModuleAction(courseId, moduleId));
   }
@@ -97,6 +99,7 @@ export function CourseModulesEditor({ courseId, modules: initialModules }: Props
 
   return (
     <Card>
+      <ConfirmDialog />
       <CardHeader>
         <CardTitle>Módulos</CardTitle>
       </CardHeader>
@@ -184,6 +187,7 @@ function SortableModule({
   const [newLessonTitle, setNewLessonTitle] = useState("");
   const [newLessonType, setNewLessonType] = useState<"VIDEO" | "PDF" | "TEXT" | "LINK" | "LIVE">("VIDEO");
   const [isPending, startTransition] = useTransition();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   function addLesson() {
     if (!newLessonTitle.trim()) return;
@@ -200,14 +204,15 @@ function SortableModule({
     });
   }
 
-  function removeLesson(lessonId: string) {
-    if (!confirm("Excluir esta aula?")) return;
+  async function removeLesson(lessonId: string) {
+    if (!await confirm({ title: "Excluir aula", description: "Excluir esta aula?", confirmLabel: "Excluir", confirmVariant: "destructive" })) return;
     onLessonDeleted(lessonId);
     startTransition(() => deleteLessonAction(courseId, lessonId));
   }
 
   return (
     <div ref={setNodeRef} style={style} className="rounded-lg border border-navy-100 bg-white">
+      <ConfirmDialog />
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           {...attributes}

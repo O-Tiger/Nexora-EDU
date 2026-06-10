@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Button, Textarea, toast } from "@nexora/ui";
 import { Reply, Trash2 } from "lucide-react";
 import { createReplyAction, deleteReplyAction } from "@/actions/communication";
+import { useConfirm } from "@/hooks/use-confirm";
 
 interface ForumReply {
   id: string;
@@ -27,6 +28,7 @@ export function ForumThreadView({ threadId, currentUserId, isStaff, initialRepli
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [body, setBody] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   function submitReply(parentId?: string) {
     if (!body.trim()) return;
@@ -48,14 +50,15 @@ export function ForumThreadView({ threadId, currentUserId, isStaff, initialRepli
     })());
   }
 
-  function removeReply(id: string) {
-    if (!confirm("Excluir esta resposta?")) return;
+  async function removeReply(id: string) {
+    if (!await confirm({ title: "Excluir resposta", description: "Excluir esta resposta?", confirmLabel: "Excluir", confirmVariant: "destructive" })) return;
     setReplies((prev) => prev.filter((r) => r.id !== id).map((r) => ({ ...r, replies: r.replies.filter((rr) => rr.id !== id) })));
     startTransition(() => void deleteReplyAction(id));
   }
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog />
       <ReplyList replies={replies} currentUserId={currentUserId} isStaff={isStaff} onReply={(id) => setReplyingTo(id)} onDelete={removeReply} depth={0} />
 
       {!locked && (

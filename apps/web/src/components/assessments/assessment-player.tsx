@@ -6,6 +6,7 @@ import { CheckCircle2, Clock } from "lucide-react";
 import { QuestionRenderer, type StudentQuestion, type AnswerValue } from "./question-renderer";
 import { FileUploadZone, type UploadedFile } from "@/components/shared/file-upload-zone";
 import { submitAssessmentAction } from "@/actions/assessments";
+import { useConfirm } from "@/hooks/use-confirm";
 
 interface Props {
   assessmentId: string;
@@ -32,13 +33,14 @@ export function AssessmentPlayer({
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [result, setResult] = useState<Result | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   const remaining = maxAttempts - attemptsUsed;
   const totalPoints = questions.reduce((s, q) => s + q.points, 0);
 
-  function submit() {
+  async function submit() {
     const unanswered = questions.filter((q) => answers[q.id] === undefined || answers[q.id] === "");
-    if (unanswered.length > 0 && !confirm(`${unanswered.length} questão(ões) sem resposta. Enviar mesmo assim?`)) {
+    if (unanswered.length > 0 && !await confirm({ title: "Enviar avaliação", description: `${unanswered.length} questão(ões) sem resposta. Enviar mesmo assim?`, confirmLabel: "Enviar" })) {
       return;
     }
 
@@ -72,6 +74,7 @@ export function AssessmentPlayer({
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog />
       <div className="rounded-lg border border-navy-100 bg-white p-5">
         <h1 className="text-xl font-bold text-navy-900">{title}</h1>
         {description && <p className="mt-1 text-sm text-navy-600">{description}</p>}
