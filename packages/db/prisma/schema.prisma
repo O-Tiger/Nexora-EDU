@@ -25,9 +25,14 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships TenantMembership[]
-  auditLogs   AuditLog[]
-  onboarding  UserOnboarding[]
+  memberships    TenantMembership[]
+  auditLogs      AuditLog[]
+  onboarding     UserOnboarding[]
+  announcements  Announcement[]
+  forumThreads   ForumThread[]  @relation("ForumThreadAuthor")
+  forumReplies   ForumReply[]   @relation("ForumReplyAuthor")
+  sentMessages   DirectMessage[] @relation("DMSender")
+  receivedMessages DirectMessage[] @relation("DMReceiver")
 
   @@index([email])
 }
@@ -76,9 +81,10 @@ model Course {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  modules     Module[]
-  enrollments Enrollment[]
-  assessments Assessment[]
+  modules       Module[]
+  enrollments   Enrollment[]
+  assessments   Assessment[]
+  announcements Announcement[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -99,8 +105,9 @@ model Module {
   /// ID do módulo que deve estar concluído antes de desbloquear este
   prerequisiteId String?
 
-  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessons Lesson[]
+  course   Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons  Lesson[]
+  threads  ForumThread[]
 
   @@index([courseId, position])
 }
@@ -309,6 +316,105 @@ model Certificate {
 
   @@index([tenantId, userId])
   @@index([code])
+}
+
+// ─── AUDITORIA ────────────────────────────────────────────────────────────────
+
+// ─── COMUNICAÇÃO ─────────────────────────────────────────────────────────────
+
+/// Aviso publicado pelo admin — visível a todos os alunos do escopo.
+model Announcement {
+  id        String             @id @default(cuid())
+  tenantId  String
+  authorId  String
+  scope     AnnouncementScope  @default(PLATFORM)
+  /// courseId obrigatório quando scope = COURSE
+  courseId  String?
+  title     String
+  body      String
+  pinned    Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  author User    @relation(fields: [authorId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, scope, createdAt])
+  @@index([tenantId, courseId])
+}
+
+enum AnnouncementScope {
+  PLATFORM
+  COURSE
+}
+
+/// Tópico de fórum ligado a um módulo de curso.
+model ForumThread {
+  id        String   @id @default(cuid())
+  tenantId  String
+  moduleId  String
+  authorId  String
+  title     String
+  body      String
+  pinned    Boolean  @default(false)
+  locked    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  module  Module        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  author  User          @relation("ForumThreadAuthor", fields: [authorId], references: [id])
+  replies ForumReply[]
+
+  @@index([tenantId, moduleId, createdAt])
+}
+
+/// Resposta a um tópico de fórum. Suporta 1 nível de aninhamento (parentId).
+model ForumReply {
+  id        String   @id @default(cuid())
+  tenantId  String
+  threadId  String
+  authorId  String
+  parentId  String?
+  body      String
+  createdAt DateTime @default(now())
+
+  thread  ForumThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author  User         @relation("ForumReplyAuthor", fields: [authorId], references: [id])
+  parent  ForumReply?  @relation("ReplyTree", fields: [parentId], references: [id])
+  replies ForumReply[] @relation("ReplyTree")
+
+  @@index([tenantId, threadId, createdAt])
+}
+
+/// Mensagem direta aluno ↔ admin. Agrupadas por threadId.
+model DirectMessage {
+  id         String   @id @default(cuid())
+  tenantId   String
+  threadId   String
+  senderId   String
+  receiverId String
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("DMSender",   fields: [senderId],   references: [id])
+  receiver User @relation("DMReceiver", fields: [receiverId], references: [id])
+
+  @@index([tenantId, threadId, createdAt])
+  @@index([tenantId, receiverId, readAt])
+}
+
+/// Entrada da base de conhecimento usada pelo chatbot como contexto RAG.
+model KnowledgeEntry {
+  id        String   @id @default(cuid())
+  tenantId  String
+  question  String
+  answer    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, active])
 }
 
 // ─── AUDITORIA ────────────────────────────────────────────────────────────────
