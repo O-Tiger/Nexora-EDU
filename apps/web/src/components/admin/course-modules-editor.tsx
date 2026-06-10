@@ -182,19 +182,21 @@ function SortableModule({
   };
 
   const [newLessonTitle, setNewLessonTitle] = useState("");
+  const [newLessonType, setNewLessonType] = useState<"VIDEO" | "PDF" | "TEXT" | "LINK" | "LIVE">("VIDEO");
   const [isPending, startTransition] = useTransition();
 
   function addLesson() {
     if (!newLessonTitle.trim()) return;
     const title = newLessonTitle.trim();
+    const type = newLessonType;
     setNewLessonTitle("");
     startTransition(async () => {
-      const result = await createLessonAction(courseId, module.id, { title, type: "VIDEO" });
+      const result = await createLessonAction(courseId, module.id, { title, type });
       if ("error" in result) {
         toast({ variant: "destructive", title: "Erro", description: result.error });
         return;
       }
-      onLessonAdded({ id: result.lessonId, title, type: "VIDEO", position: module.lessons.length + 1 });
+      onLessonAdded({ id: result.lessonId, title, type, position: module.lessons.length + 1 });
     });
   }
 
@@ -260,6 +262,17 @@ function SortableModule({
           ))}
 
           <div className="flex gap-2 pt-1">
+            <select
+              value={newLessonType}
+              onChange={(e) => setNewLessonType(e.target.value as typeof newLessonType)}
+              className="h-8 rounded-md border border-navy-200 bg-white px-2 text-xs text-navy-700 shrink-0"
+            >
+              <option value="VIDEO">Vídeo</option>
+              <option value="PDF">PDF / Arquivo</option>
+              <option value="TEXT">Texto</option>
+              <option value="LINK">Link externo</option>
+              <option value="LIVE">Ao vivo</option>
+            </select>
             <Input
               placeholder="Nome da aula"
               value={newLessonTitle}
