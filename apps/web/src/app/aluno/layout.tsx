@@ -1,6 +1,7 @@
 import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import { StudentSidebar } from "@/components/aluno/student-sidebar";
+import { ChatbotWidget } from "@/components/communication/chatbot-widget";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -12,6 +13,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
       <main className="flex-1 overflow-x-hidden">
         <div className="mx-auto max-w-5xl p-6">{children}</div>
       </main>
+      <ChatbotWidget />
     </div>
   );
 }

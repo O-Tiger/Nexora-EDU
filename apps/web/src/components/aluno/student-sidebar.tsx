@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Home, LogOut, Menu, X, FileCheck2 } from "lucide-react";
+import { BookOpen, Home, LogOut, Menu, X, FileCheck2, MessageSquare } from "lucide-react";
 import { cn, Button, BRAND } from "@nexora/ui";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/aluno", label: "Início", icon: Home, exact: true },
   { href: "/aluno/cursos", label: "Meus Cursos", icon: BookOpen },
   { href: "/aluno/avaliacoes", label: "Avaliações", icon: FileCheck2 },
+  { href: "/aluno/comunicacao", label: "Comunicação", icon: MessageSquare },
 ];
 
 export function StudentSidebar({ user }: { user: { name: string; tenantId: string } }) {

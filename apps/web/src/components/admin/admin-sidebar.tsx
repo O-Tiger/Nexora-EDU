@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Users, GraduationCap, LayoutDashboard, LogOut, Menu, Upload, X, Layout } from "lucide-react";
+import { BookOpen, Users, GraduationCap, LayoutDashboard, LogOut, Menu, Upload, X, Layout, MessageSquare } from "lucide-react";
 import { cn, Badge, Button, BRAND } from "@nexora/ui";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
@@ -25,6 +25,7 @@ const navItems = [
   { href: "/admin/alunos", label: "Alunos", icon: GraduationCap },
   { href: "/admin/matriculas", label: "Matrículas", icon: Users },
   { href: "/admin/paginas", label: "Páginas", icon: Layout },
+  { href: "/admin/comunicacao", label: "Comunicação", icon: MessageSquare },
   { href: "/admin/importar", label: "Importar curso", icon: Upload },
 ];
 

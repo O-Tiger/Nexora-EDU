@@ -9,6 +9,15 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 2 — Comunicação)
+- `packages/db`: models `Announcement`, `ForumThread`, `ForumReply`, `DirectMessage`, `KnowledgeEntry` + migration; queries de avisos, fórum, mensagens e base de conhecimento
+- `packages/validators`: schemas Zod de avisos, fórum, mensagens diretas e chatbot
+- `apps/web`: avisos segmentados (plataforma/curso) com pin, admin publica/exclui em `/admin/comunicacao`
+- `apps/web`: fórum por módulo — tópicos, respostas aninhadas (1 nível), bloqueio e pin pelo staff
+- `apps/web`: mensagens diretas aluno ↔ admin com leitura automática e badge de não-lidas
+- `apps/web`: chatbot Groq llama3-8b com RAG (base de conhecimento editável por tenant), escalonamento para Digisac registrado em AuditLog
+- `apps/web`: `ChatbotWidget` flutuante no layout do aluno; base de conhecimento editável em `/admin/comunicacao`
+
 ### Added (Fase 2 — Avaliações)
 - `packages/db`: models `Assessment`, `Question`, `Submission` (+ enums) e `Course.gradeFormula`; queries de avaliações e submissões com auto-correção
 - `packages/validators`: schemas Zod de avaliação, questão (MC/V-F/dissertativa) e respostas
