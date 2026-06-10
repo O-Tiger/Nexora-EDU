@@ -19,7 +19,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, toast } from "@nexora/ui";
-import { GripVertical, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { GripVertical, Plus, Trash2, ChevronDown, ChevronRight, Video } from "lucide-react";
 import {
   createModuleAction,
   deleteModuleAction,
@@ -239,6 +240,15 @@ function SortableModule({
             <div key={lesson.id} className="flex items-center gap-2 rounded-md bg-navy-50 px-3 py-1.5 text-sm">
               <span className="flex-1 text-navy-700">{lesson.title}</span>
               <span className="text-xs text-navy-400 uppercase">{lesson.type}</span>
+              {lesson.type === "LIVE" && (
+                <Link
+                  href={`/admin/cursos/${courseId}/aulas/${lesson.id}/live` as never}
+                  className="p-0.5 text-teal-500 hover:text-teal-700 transition-colors"
+                  aria-label="Gerenciar aula ao vivo"
+                >
+                  <Video className="h-3 w-3" />
+                </Link>
+              )}
               <button
                 onClick={() => removeLesson(lesson.id)}
                 className="p-0.5 text-navy-300 hover:text-red-500 transition-colors"

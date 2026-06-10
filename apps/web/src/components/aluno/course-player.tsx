@@ -5,7 +5,17 @@ import { useRouter } from "next/navigation";
 import { Check, ChevronRight, FileText, Link2, Play, Video } from "lucide-react";
 import { cn, Button } from "@nexora/ui";
 import { markLessonCompleteAction, markLessonIncompleteAction } from "@/actions/progress";
+import { LiveRoom } from "@/components/live/live-room";
 import type { LessonType } from "@nexora/db";
+
+export type LiveSessionData = {
+  id: string;
+  meetingUrl: string;
+  startAt: Date;
+  durationMin: number;
+  status: "SCHEDULED" | "LIVE" | "ENDED" | "CANCELLED";
+  recordingUrl?: string | null;
+};
 
 type Lesson = {
   id: string;
@@ -15,6 +25,7 @@ type Lesson = {
   videoRef?: string | null;
   content?: string | null;
   url?: string | null;
+  liveSession?: LiveSessionData | null;
 };
 
 type Module = {
@@ -190,17 +201,23 @@ function LessonContent({ lesson }: { lesson: Lesson }) {
       );
 
     case "LIVE":
+      if (lesson.liveSession) {
+        return (
+          <LiveRoom
+            liveSessionId={lesson.liveSession.id}
+            title={lesson.title}
+            meetingUrl={lesson.liveSession.meetingUrl}
+            startAt={lesson.liveSession.startAt}
+            durationMin={lesson.liveSession.durationMin}
+            status={lesson.liveSession.status}
+            {...(lesson.liveSession.recordingUrl !== undefined && { recordingUrl: lesson.liveSession.recordingUrl })}
+          />
+        );
+      }
       return (
         <div className="flex flex-col items-center justify-center gap-4 p-8">
           <Video className="h-12 w-12 text-navy-300" />
-          <p className="text-navy-600">Aula ao vivo — aguarde o link ser disponibilizado.</p>
-          {lesson.url && (
-            <Button asChild>
-              <a href={lesson.url} target="_blank" rel="noopener noreferrer">
-                Entrar na aula
-              </a>
-            </Button>
-          )}
+          <p className="text-navy-600">Aula ao vivo — aguarde o agendamento ser publicado.</p>
         </div>
       );
   }

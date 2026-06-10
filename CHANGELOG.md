@@ -9,6 +9,14 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 2 — Aulas ao vivo)
+- `packages/db`: models `LiveSession` (agendamento, URL, status, gravação) e `LiveAttendance` (presença automática) + migration; queries CRUD, registro de presença e conclusão automática de aula ao vivo
+- `packages/validators`: schema Zod de criação/atualização de sessão com validação de URL e data futura
+- `apps/web`: sala de espera com countdown server-side + embed iframe (Zoom/Meet/Teams) no `CoursePlayer`
+- `apps/web`: admin agenda, inicia, encerra e vincula gravação YouTube em `/admin/cursos/[id]/aulas/[lessonId]/live`; ícone de atalho nas aulas LIVE no editor de módulos
+- `apps/web`: presença automática registrada ao aluno entrar na sala; aula marcada como concluída
+- `apps/web`: cron `/api/cron/live-reminders` que registra lembretes em AuditLog 15 min antes (pronto para plugar Digisac)
+
 ### Added (Fase 2 — Comunicação)
 - `packages/db`: models `Announcement`, `ForumThread`, `ForumReply`, `DirectMessage`, `KnowledgeEntry` + migration; queries de avisos, fórum, mensagens e base de conhecimento
 - `packages/validators`: schemas Zod de avisos, fórum, mensagens diretas e chatbot
