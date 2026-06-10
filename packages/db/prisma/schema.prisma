@@ -128,10 +128,56 @@ model Lesson {
   url      String?
   duration Int? // segundos
 
-  module   Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  progress LessonProgress[]
+  module      Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress    LessonProgress[]
+  liveSession LiveSession?
 
   @@index([moduleId, position])
+}
+
+/// Sessão ao vivo vinculada a uma aula do tipo LIVE.
+model LiveSession {
+  id         String          @id @default(cuid())
+  tenantId   String
+  lessonId   String          @unique
+  /// URL da reunião: Zoom, Google Meet, Teams, etc.
+  meetingUrl String
+  /// Data/hora de início agendada
+  startAt    DateTime
+  /// Duração prevista em minutos
+  durationMin Int            @default(60)
+  status     LiveStatus      @default(SCHEDULED)
+  /// Link da gravação no YouTube após o evento
+  recordingUrl String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  lesson     Lesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  attendances LiveAttendance[]
+
+  @@index([tenantId, startAt])
+  @@index([tenantId, status])
+}
+
+enum LiveStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELLED
+}
+
+/// Registro de presença de um aluno numa sessão ao vivo.
+model LiveAttendance {
+  id            String      @id @default(cuid())
+  liveSessionId String
+  enrollmentId  String
+  joinedAt      DateTime    @default(now())
+  leftAt        DateTime?
+
+  liveSession LiveSession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([liveSessionId, enrollmentId])
+  @@index([liveSessionId])
 }
 
 enum LessonType {
