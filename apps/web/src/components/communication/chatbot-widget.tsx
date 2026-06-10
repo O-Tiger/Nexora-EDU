@@ -51,10 +51,10 @@ export function ChatbotWidget() {
       {/* Botão flutuante */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-5 right-5 z-50 flex h-13 w-13 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg transition hover:bg-teal-700"
+        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-teal-600 text-white shadow-lg transition hover:bg-teal-700 active:scale-95"
         aria-label="Abrir assistente"
       >
-        {open ? <X className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
+        {open ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
       </button>
 
       {/* Painel do chat */}
