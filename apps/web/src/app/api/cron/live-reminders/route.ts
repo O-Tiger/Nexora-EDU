@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@nexora/db";
 import { createAuditLog } from "@nexora/db/src/queries/audit";
+import { sendWhatsAppEvent } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Cron chamado a cada minuto (ou a cada 5 min) pelo agendador externo (Railway, Vercel, etc.)
-// Verifica sessões SCHEDULED que começam nos próximos 15 min e registra lembretes.
-
 const REMINDER_WINDOW_MS = 15 * 60 * 1000; // 15 min
 
 export async function POST(req: Request) {
-  // Validação simples de segurança — segredo compartilhado no header
   const secret = process.env.CRON_SECRET;
   if (secret && req.headers.get("x-cron-secret") !== secret) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
@@ -20,7 +17,6 @@ export async function POST(req: Request) {
   const now = new Date();
   const windowEnd = new Date(now.getTime() + REMINDER_WINDOW_MS);
 
-  // Sessões que começam nos próximos 15 min e ainda não foram iniciadas
   const sessions = await prisma.liveSession.findMany({
     where: {
       status: "SCHEDULED",
@@ -52,8 +48,15 @@ export async function POST(req: Request) {
     const course = session.lesson.module.course;
     const tenantId = course.tenantId;
 
+    // Fetch phones once for all enrolled users of this session
+    const userIds = course.enrollments.map((e) => e.userId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, phone: true },
+    });
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
     for (const enrollment of course.enrollments) {
-      // Evitar lembretes duplicados: verificar se já existe AuditLog para este par
       const already = await prisma.auditLog.findFirst({
         where: {
           tenantId,
@@ -67,8 +70,17 @@ export async function POST(req: Request) {
       await createAuditLog(tenantId, enrollment.userId, "live.reminder", `liveSession:${session.id}`, {
         lessonTitle: session.lesson.title,
         startAt: session.startAt.toISOString(),
-        // TODO(fase-2-digisac): chamar sendWhatsApp quando disponível
       });
+
+      const user = userMap.get(enrollment.userId);
+      if (user?.phone) {
+        void sendWhatsAppEvent(tenantId, "live.reminder", user.phone, {
+          name: user.name,
+          lesson: session.lesson.title,
+          date: session.startAt.toLocaleDateString("pt-BR"),
+          time: session.startAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        });
+      }
 
       reminded++;
     }

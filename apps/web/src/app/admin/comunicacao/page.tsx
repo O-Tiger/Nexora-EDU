@@ -7,7 +7,7 @@ import { getAnnouncements } from "@nexora/db/src/queries/announcements";
 import { getMessageThreads } from "@nexora/db/src/queries/messages";
 import { getKnowledgeEntries } from "@nexora/db/src/queries/knowledge";
 import { Badge } from "@nexora/ui";
-import { Megaphone, MessageSquare, BookOpen, Trash2, Pin } from "lucide-react";
+import { Megaphone, MessageSquare, BookOpen, Trash2, Pin, MessageCircle } from "lucide-react";
 import { AnnouncementForm } from "@/components/communication/announcement-form";
 import { KnowledgeEditor } from "@/components/communication/knowledge-editor";
 import { deleteAnnouncementAction } from "@/actions/communication";
@@ -109,6 +109,25 @@ export default async function AdminCommunicationPage() {
             })}
           </div>
         )}
+      </section>
+
+      {/* ─── WhatsApp ───────────────────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-teal-600" />
+            <h2 className="text-lg font-semibold text-navy-900">WhatsApp (Digisac)</h2>
+          </div>
+          <Link
+            href={"/admin/comunicacao/whatsapp" as never}
+            className="text-sm text-teal-600 hover:underline"
+          >
+            Gerenciar templates →
+          </Link>
+        </div>
+        <p className="mt-1 text-xs text-navy-400">
+          Configure os textos enviados automaticamente em cada evento (matrícula, lembretes, certificados).
+        </p>
       </section>
 
       {/* ─── Base de conhecimento ───────────────────────────────────────── */}

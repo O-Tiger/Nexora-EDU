@@ -9,6 +9,19 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 2 — Digisac + Omie)
+- `packages/db`: campo `User.phone` (E.164 sem '+'); models `WhatsAppTemplate` (templates por evento/tenant, com placeholders `{{name}}` etc.) e `OmieSync` (estado de sincronia matrícula↔Omie) + migration manual
+- `packages/notifications`: implementação real do cliente Digisac — `sendWhatsApp()` faz POST para a API com fallback silencioso quando `DIGISAC_TOKEN`/`DIGISAC_SUBDOMAIN` não estão presentes
+- `apps/web/src/lib/whatsapp.ts`: helper `sendWhatsAppEvent()` que resolve template do banco, renderiza `{{placeholders}}` e despacha via Digisac
+- `apps/web/src/lib/omie.ts`: cliente JSON-RPC Omie — `upsertOmieClient()`, `createOmieReceivable()`, `syncEnrollmentToOmie()` (fire-and-forget com persistência em OmieSync; skipa `inst_b`)
+- `apps/web`: `enrollUserAction` dispara WhatsApp `enrollment.created` + sync Omie em fire-and-forget após matrícula
+- `apps/web`: `reactivateEnrollmentAction` dispara WhatsApp `enrollment.reactivated`
+- `apps/web`: cron `live-reminders` envia WhatsApp `live.reminder` com `{{name}}`, `{{lesson}}`, `{{date}}`, `{{time}}`
+- `apps/web`: webhook `/api/webhooks/digisac` — valida bearer token, rota mensagem inbound para `DirectMessage` pelo telefone do usuário
+- `apps/web`: webhook `/api/webhooks/omie` — valida `X-Omie-Token`, processa `ContaReceberPaga`/`ContaReceberCancelada`, registra em AuditLog
+- `apps/web`: admin gerencia templates em `/admin/comunicacao/whatsapp` — CRUD por evento com preview de placeholders e toggle ativo/inativo
+- `.env.example`: adicionados `DIGISAC_WEBHOOK_SECRET` e `OMIE_WEBHOOK_SECRET`
+
 ### Added (Fase 2 — Aulas ao vivo)
 - `packages/db`: models `LiveSession` (agendamento, URL, status, gravação) e `LiveAttendance` (presença automática) + migration; queries CRUD, registro de presença e conclusão automática de aula ao vivo
 - `packages/validators`: schema Zod de criação/atualização de sessão com validação de URL e data futura

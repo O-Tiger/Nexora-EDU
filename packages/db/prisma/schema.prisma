@@ -21,6 +21,8 @@ model User {
   name         String
   /// Opcional: vínculo cross-tenant é feito por email; CPF pode ser complementado depois
   cpf          String?  @unique
+  /// Telefone no formato E.164 sem '+' (ex: "5511999999999") — usado para WhatsApp via Digisac
+  phone        String?
   avatarUrl    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -501,4 +503,47 @@ model UserOnboarding {
 
   @@unique([userId, tourId])
   @@index([userId])
+}
+
+// ─── INTEGRAÇÕES ──────────────────────────────────────────────────────────────
+
+/// Template de mensagem WhatsApp por evento, configurável pelo admin por tenant.
+/// bodyTemplate usa {{placeholders}}: {{name}}, {{course}}, {{date}}, {{link}}, etc.
+model WhatsAppTemplate {
+  id           String       @id @default(cuid())
+  tenantId     String
+  event        String
+  /// Texto do template com {{placeholders}}
+  bodyTemplate String
+  isActive     Boolean      @default(true)
+  updatedAt    DateTime     @updatedAt
+  updatedBy    String
+
+  @@unique([tenantId, event])
+  @@index([tenantId, isActive])
+}
+
+/// Rastreia a sincronização de uma matrícula com o Omie ERP.
+model OmieSync {
+  id                 String    @id @default(cuid())
+  enrollmentId       String    @unique
+  tenantId           String
+  /// ID do cliente no Omie (codigo_cliente_omie)
+  omieClientId       String?
+  /// ID da conta a receber no Omie
+  omieReceivableId   String?
+  status             OmieSyncStatus @default(PENDING)
+  lastSyncedAt       DateTime?
+  errorMessage       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([tenantId, status])
+  @@index([enrollmentId])
+}
+
+enum OmieSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
 }
