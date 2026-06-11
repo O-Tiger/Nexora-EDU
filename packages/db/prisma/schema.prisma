@@ -24,6 +24,10 @@ model User {
   /// Telefone no formato E.164 sem '+' (ex: "5511999999999") — usado para WhatsApp via Digisac
   phone        String?
   avatarUrl    String?
+  /// Data de aceite dos termos e política de privacidade (LGPD). Null = não consentiu ainda.
+  consentedAt  DateTime?
+  /// Null = conta ativa. Preenchido quando usuário solicita exclusão de dados (LGPD art. 18).
+  anonymizedAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -546,4 +550,29 @@ enum OmieSyncStatus {
   PENDING
   SYNCED
   FAILED
+}
+
+// ─── LGPD ─────────────────────────────────────────────────────────────────────
+
+/// Exportação de dados pessoais solicitada pelo usuário (art. 18 LGPD).
+/// O arquivo JSON é armazenado no R2 com presigned URL válida por 24h.
+model UserDataExport {
+  id        String             @id @default(cuid())
+  userId    String
+  tenantId  String
+  status    DataExportStatus   @default(PENDING)
+  /// Chave do arquivo JSON no R2 (vazia enquanto PENDING)
+  r2Key     String?
+  /// Momento em que a URL expira (now + 24h)
+  expiresAt DateTime?
+  createdAt DateTime           @default(now())
+
+  @@index([userId])
+  @@index([tenantId, status])
+}
+
+enum DataExportStatus {
+  PENDING
+  READY
+  EXPIRED
 }

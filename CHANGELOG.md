@@ -9,6 +9,16 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 2 — LGPD)
+- `packages/db`: campos `User.consentedAt` e `User.anonymizedAt`; model `UserDataExport` (PENDING/READY/EXPIRED) + migration manual
+- `apps/web`: gate de consentimento no layout `/aluno` — redireciona para `/consentimento` se `consentedAt` for null
+- `apps/web`: página `/consentimento` com termos e política de privacidade, botão de aceite que persiste `consentedAt`
+- `apps/web`: `/aluno/meus-dados` — exibe dados pessoais, exporta JSON via R2 (presigned URL 24h), exclusão de conta com anonimização imediata
+- `apps/web`: API `/api/meus-dados/export` — coleta dados (perfil, matrículas, submissões, fórum, mensagens, auditlog), faz upload ao R2, retorna presigned URL 24h
+- `apps/web`: server actions `acceptConsentAction`, `requestDataExportAction`, `requestAccountDeletionAction` com rate limit (1 export/24h) e auditlog em todos os eventos LGPD
+- `apps/web`: link "Meus Dados" adicionado ao `StudentSidebar`
+- `apps/web/src/lib/r2.ts`: `getPresignedDownloadUrl` aceita `expiresIn` customizado
+
 ### Added (Fase 2 — Digisac + Omie)
 - `packages/db`: campo `User.phone` (E.164 sem '+'); models `WhatsAppTemplate` (templates por evento/tenant, com placeholders `{{name}}` etc.) e `OmieSync` (estado de sincronia matrícula↔Omie) + migration manual
 - `packages/notifications`: implementação real do cliente Digisac — `sendWhatsApp()` faz POST para a API com fallback silencioso quando `DIGISAC_TOKEN`/`DIGISAC_SUBDOMAIN` não estão presentes
