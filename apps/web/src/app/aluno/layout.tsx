@@ -21,7 +21,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   return (
     <div className="flex min-h-screen bg-navy-50">
       <StudentSidebar user={{ name: session.user.name, tenantId: session.user.activeTenantId }} />
-      <main className="flex-1 overflow-x-hidden">
+      <main id="main-content" className="flex-1 overflow-x-hidden" tabIndex={-1}>
         <div className="mx-auto max-w-5xl p-6 pt-16 lg:pt-6">{children}</div>
       </main>
       <ChatbotWidget />

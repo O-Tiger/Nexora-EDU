@@ -22,3 +22,24 @@
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2;
   }
 }
+
+/* WCAG 2.1 SC 2.4.7 — visible focus for all keyboard-navigable elements */
+@layer base {
+  :focus-visible {
+    @apply outline-none ring-2 ring-teal-500 ring-offset-2;
+  }
+
+  /* SC 1.4.3 — ensure minimum contrast on placeholder text */
+  ::placeholder {
+    @apply text-navy-400;
+  }
+
+  /* SC 2.3.3 — respect prefers-reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

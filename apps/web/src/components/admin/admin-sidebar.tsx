@@ -38,13 +38,13 @@ export function AdminSidebar({ user }: Props) {
   const [open, setOpen] = useState(false);
 
   const sidebar = (
-    <aside className="flex h-full w-64 flex-col border-r border-navy-100 bg-white">
+    <aside aria-label="Menu lateral" className="flex h-full w-64 flex-col border-r border-navy-100 bg-white">
       <div className="border-b border-navy-100 px-5 py-4">
         <p className="text-lg font-bold text-navy-900">{BRAND.name}</p>
         <p className="text-xs text-navy-400">{tenantLabels[user.tenantId] ?? user.tenantId}</p>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+      <nav aria-label="Navegação administrativa" className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {navItems.map((item) => {
           const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
           return (
@@ -52,14 +52,15 @@ export function AdminSidebar({ user }: Props) {
               key={item.href}
               href={item.href as never}
               onClick={() => setOpen(false)}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-ring",
                 active
                   ? "bg-teal-50 text-teal-700"
                   : "text-navy-600 hover:bg-navy-50 hover:text-navy-900",
               )}
             >
-              <item.icon className="h-4 w-4 shrink-0" />
+              <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               {item.label}
             </Link>
           );

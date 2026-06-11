@@ -9,6 +9,11 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 2 — WCAG / PWA / i18n)
+- **WCAG 2.1 AA**: skip-to-content link em todas as páginas (SC 2.4.1); `id="main-content"` + `tabIndex={-1}` em `<main>`; `aria-label` em `<aside>` e `<nav>`; `aria-current="page"` nos links de navegação ativos; `aria-hidden="true"` em ícones decorativos; `focus-visible` global com anel teal; `prefers-reduced-motion` desativa animações; `focus-ring` utility aplicado aos links de navegação
+- **PWA**: `public/manifest.webmanifest` (name, icons 192/512, start_url, display standalone, shortcuts); meta tags `theme-color`, `viewport`, `apple-mobile-web-app-capable` no root layout via `Viewport` export; `@ducanh2912/next-pwa` integrado ao `next.config.ts` (desabilitado em dev, Workbox em produção)
+- **i18n**: `next-intl` instalado; mensagens pt/en/es em `apps/web/messages/`; locale detectado por cookie `NEXT_LOCALE`; `NextIntlClientProvider` no root layout; `LocaleSwitcher` no `StudentSidebar` (PT / EN / ES); sem prefixo de URL para preservar `typedRoutes`
+
 ### Added (Fase 2 — LGPD)
 - `packages/db`: campos `User.consentedAt` e `User.anonymizedAt`; model `UserDataExport` (PENDING/READY/EXPIRED) + migration manual
 - `apps/web`: gate de consentimento no layout `/aluno` — redireciona para `/consentimento` se `consentedAt` for null

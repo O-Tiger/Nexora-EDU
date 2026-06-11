@@ -1,0 +1,59 @@
+{
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "create": "Crear",
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "success": "Operación exitosa",
+    "confirm": "Confirmar",
+    "back": "Volver",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "noResults": "Sin resultados",
+    "required": "Campo requerido"
+  },
+  "nav": {
+    "home": "Inicio",
+    "courses": "Mis Cursos",
+    "assessments": "Evaluaciones",
+    "communication": "Comunicación",
+    "myData": "Mis Datos",
+    "logout": "Salir",
+    "admin": "Admin",
+    "students": "Alumnos",
+    "enrollments": "Matrículas"
+  },
+  "auth": {
+    "login": "Ingresar",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "forgotPassword": "Olvidé mi contraseña"
+  },
+  "courses": {
+    "title": "Cursos",
+    "empty": "Sin cursos aún",
+    "emptyDescription": "Aún no estás matriculado en ningún curso.",
+    "markComplete": "Marcar como completada",
+    "completed": "Completada",
+    "progress": "{completed} / {total} clases"
+  },
+  "assessments": {
+    "title": "Evaluaciones",
+    "empty": "Sin evaluaciones disponibles",
+    "submit": "Enviar respuestas",
+    "score": "Nota: {score}",
+    "passed": "Aprobado",
+    "failed": "Reprobado"
+  },
+  "errors": {
+    "notFound": "Página no encontrada",
+    "notFoundDescription": "La página que buscas no existe.",
+    "forbidden": "Acceso denegado",
+    "forbiddenDescription": "No tienes permiso para acceder a esta área.",
+    "serverError": "Algo salió mal",
+    "serverErrorDescription": "Tus datos están seguros. Intenta de nuevo."
+  }
+}
