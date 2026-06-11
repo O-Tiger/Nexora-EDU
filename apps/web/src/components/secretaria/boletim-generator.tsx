@@ -30,8 +30,18 @@ export function BoletimGenerator({ turmaId, turmaCode, students }: Props) {
   }
 
   function generate(enrollmentId?: string) {
-    // html abre em nova aba; pdf/doc disparam download
-    window.open(url(enrollmentId), "_blank");
+    // Âncora evita o popup que falha em "chrome-error" ao baixar arquivos.
+    const a = document.createElement("a");
+    a.href = url(enrollmentId);
+    if (format === "html") {
+      a.target = "_blank";
+      a.rel = "noopener";
+    } else {
+      a.download = ""; // respeita o Content-Disposition do servidor
+    }
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   return (

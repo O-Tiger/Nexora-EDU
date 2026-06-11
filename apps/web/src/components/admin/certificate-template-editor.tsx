@@ -41,8 +41,15 @@ export function CertificateTemplateEditor({ initial }: { initial: Template }) {
       });
       if ("error" in r) { toast({ variant: "destructive", title: "Erro", description: r.error }); return; }
       toast({ title: "Template salvo" });
-      if (then === "preview") window.open("/api/admin/certificado-preview?format=html", "_blank");
-      if (then === "pdf") window.open("/api/admin/certificado-preview?format=pdf", "_blank");
+      if (then === "preview") window.open("/api/admin/certificado-preview?format=html", "_blank", "noopener");
+      if (then === "pdf") {
+        const a = document.createElement("a");
+        a.href = "/api/admin/certificado-preview?format=pdf";
+        a.download = "";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
     });
   }
 
