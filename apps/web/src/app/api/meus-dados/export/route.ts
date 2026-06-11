@@ -76,29 +76,34 @@ export async function POST(req: Request) {
 
   const json = JSON.stringify(payload, null, 2);
   const r2Key = `exports/${userId}/${Date.now()}.json`;
-
-  try {
-    await uploadToR2(r2Key, Buffer.from(json, "utf-8"), "application/json");
-  } catch (err) {
-    console.error(`[lgpd.export] R2 upload failed: ${err}`);
-    return NextResponse.json({ error: "Falha ao gerar exportação. Tente novamente." }, { status: 500 });
-  }
-
   const expiresAt = new Date(Date.now() + EXPORT_TTL_SECONDS * 1000);
+
+  const r2Available = !!(
+    process.env.CLOUDFLARE_R2_ACCOUNT_ID &&
+    process.env.CLOUDFLARE_R2_ACCESS_KEY &&
+    process.env.CLOUDFLARE_R2_SECRET_KEY
+  );
+
+  let downloadUrl: string;
+
+  if (r2Available) {
+    try {
+      await uploadToR2(r2Key, Buffer.from(json, "utf-8"), "application/json");
+      downloadUrl = await getPresignedDownloadUrl(r2Key, EXPORT_TTL_SECONDS);
+    } catch (err) {
+      console.error(`[lgpd.export] R2 upload failed: ${err}`);
+      return NextResponse.json({ error: "Falha ao gerar exportação. Tente novamente." }, { status: 500 });
+    }
+  } else {
+    // Dev fallback: return JSON as data URI — browser downloads directly, no R2 needed
+    const b64 = Buffer.from(json, "utf-8").toString("base64");
+    downloadUrl = `data:application/json;base64,${b64}`;
+  }
 
   await prisma.userDataExport.update({
     where: { id: exportId },
-    data: { status: "READY", r2Key, expiresAt },
+    data: { status: "READY", r2Key: r2Available ? r2Key : "local", expiresAt },
   });
-
-  // Generate presigned URL valid for 24h
-  let downloadUrl: string;
-  try {
-    downloadUrl = await getPresignedDownloadUrl(r2Key, EXPORT_TTL_SECONDS);
-  } catch {
-    // R2 not configured in dev — return a placeholder
-    downloadUrl = "#r2-not-configured";
-  }
 
   await createAuditLog(tenantId, userId, "lgpd.export_generated", `userDataExport:${exportId}`, {
     r2Key,
