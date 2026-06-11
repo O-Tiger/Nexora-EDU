@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { School, Building2, BookOpen, Users, Plus, ChevronRight } from "lucide-react";
+import { School, Building2, BookOpen, Users, Plus, ChevronRight, BookMarked, FileText } from "lucide-react";
 import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
 import { getAnosLetivos, getAnoLetivoAtivo, getUnidades, getSecretariaOverview } from "@nexora/db/src/queries/secretaria";
@@ -36,6 +36,19 @@ export default async function SecretariaPage() {
           Secretaria
         </h1>
         <p className="text-sm text-navy-500">Gestão de unidades, turmas e matrículas K-12.</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <Link href={"/admin/secretaria/disciplinas" as never} className="gap-2">
+            <BookMarked className="h-4 w-4" /> Disciplinas & Frentes
+          </Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={"/admin/secretaria/boletins" as never} className="gap-2">
+            <FileText className="h-4 w-4" /> Boletins
+          </Link>
+        </Button>
       </div>
 
       {/* Overview cards */}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, UserPlus, Users, ClipboardList } from "lucide-react";
 import { Button, Badge } from "@nexora/ui";
 import { getTurmaById } from "@nexora/db/src/queries/secretaria";
 import { ETAPA_LABELS, type Etapa } from "@nexora/validators";
@@ -66,13 +66,20 @@ export default async function TurmaDetailPage({ params }: { params: Promise<{ id
             {turma.unidade.name} · {turma.anoLetivo.year}
           </p>
         </div>
-        <TurmaDeleteButton
-          turmaId={id}
-          code={turma.code}
-          unidadeId={turma.unidadeId}
-          anoLetivoId={turma.anoLetivoId}
-          hasStudents={turma.enrollments.length > 0}
-        />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/admin/secretaria/turmas/${id}/notas` as never} className="gap-2">
+              <ClipboardList className="h-4 w-4" /> Lançar notas
+            </Link>
+          </Button>
+          <TurmaDeleteButton
+            turmaId={id}
+            code={turma.code}
+            unidadeId={turma.unidadeId}
+            anoLetivoId={turma.anoLetivoId}
+            hasStudents={turma.enrollments.length > 0}
+          />
+        </div>
       </div>
 
       {!isFull && (

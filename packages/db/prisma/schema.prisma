@@ -655,6 +655,7 @@ model Turma {
   unidade     Unidade         @relation(fields: [unidadeId], references: [id])
   anoLetivo   AnoLetivo       @relation(fields: [anoLetivoId], references: [id])
   enrollments TurmaEnrollment[]
+  disciplinas TurmaDisciplina[]
 
   @@unique([tenantId, anoLetivoId, code])
   @@index([tenantId, anoLetivoId])
@@ -692,8 +693,10 @@ model TurmaEnrollment {
   cancelledAt DateTime?
   notes       String?
 
-  turma   Turma @relation(fields: [turmaId], references: [id], onDelete: Cascade)
-  student User  @relation("StudentTurmaEnrollments", fields: [studentId], references: [id])
+  turma       Turma        @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  student     User         @relation("StudentTurmaEnrollments", fields: [studentId], references: [id])
+  grades      Grade[]
+  attendances Attendance[]
 
   /// Um aluno só pode estar em uma turma por ano letivo
   @@unique([studentId, anoLetivoId])
@@ -736,4 +739,90 @@ enum GuardianRelationship {
   MAE
   RESPONSAVEL
   OUTRO
+}
+
+// ─── PEDAGÓGICO ───────────────────────────────────────────────────────────────
+
+/// Disciplina de uma etapa (ex: "Matemática"). Pode ter frentes — sub-disciplinas
+/// graduadas separadamente (ex: "Matemática 1", "Matemática 2"). Frente = Disciplina
+/// com parentId preenchido. No boletim, pai e frentes aparecem como linhas próprias.
+model Disciplina {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  /// null = disciplina raiz; preenchido = frente de outra disciplina
+  parentId  String?
+  /// Ordem de exibição no boletim
+  position  Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  parent           Disciplina?       @relation("Frentes", fields: [parentId], references: [id], onDelete: Cascade)
+  frentes          Disciplina[]      @relation("Frentes")
+  turmaDisciplinas TurmaDisciplina[]
+  grades           Grade[]
+  attendances      Attendance[]
+
+  @@index([tenantId, parentId])
+  @@index([tenantId, active])
+}
+
+/// Vínculo disciplina ↔ turma (quais disciplinas a turma cursa).
+model TurmaDisciplina {
+  id           String @id @default(cuid())
+  tenantId     String
+  turmaId      String
+  disciplinaId String
+
+  turma      Turma      @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([turmaId, disciplinaId])
+  @@index([tenantId, turmaId])
+}
+
+/// Nota de um aluno numa disciplina, por período (trimestre) e tipo de avaliação.
+model Grade {
+  id           String    @id @default(cuid())
+  tenantId     String
+  enrollmentId String
+  disciplinaId String
+  /// 1, 2, 3 = trimestre; usado com kind para localizar a célula do boletim
+  period       Int
+  kind         GradeKind
+  score        Float?
+  updatedAt    DateTime  @updatedAt
+  updatedBy    String
+
+  enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  disciplina Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, disciplinaId, period, kind])
+  @@index([tenantId, enrollmentId])
+  @@index([disciplinaId])
+}
+
+enum GradeKind {
+  /// Avaliação do trimestre
+  AVA
+  /// Recuperação do trimestre
+  RECP
+  /// Prova final
+  FINAL
+}
+
+/// Frequência: faltas acumuladas de um aluno numa disciplina.
+model Attendance {
+  id           String   @id @default(cuid())
+  tenantId     String
+  enrollmentId String
+  disciplinaId String
+  absences     Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  disciplina Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, disciplinaId])
+  @@index([tenantId, enrollmentId])
 }
