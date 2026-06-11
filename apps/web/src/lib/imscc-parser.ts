@@ -278,6 +278,66 @@ async function walkItems(
   flush();
 }
 
+// ─── Categorização de materiais ────────────────────────────────────────────────
+
+/** Extrai o número de módulo de um título (ex: "Textos - Módulo 3: ..." → 3). */
+function moduleNumberOf(title: string): number | null {
+  const m = title.match(/m[óo]dulo\s*0*(\d+)/i);
+  return m && m[1] ? parseInt(m[1], 10) : null;
+}
+
+/**
+ * Detecta um "container de materiais": módulo cujo título indica anexos/arquivos,
+ * ou que é composto exclusivamente por arquivos (PDF) — padrão comum de exports
+ * que separam os textos/PDFs numa pasta única em vez de aninhá-los por módulo.
+ */
+function isMaterialsModule(m: ImsccModule): boolean {
+  if (/materiai?s|material|anexos|arquivos|documentos|biblioteca|downloads?/i.test(m.title)) return true;
+  return m.lessons.length > 1 && m.lessons.every((l) => l.type === "PDF");
+}
+
+/**
+ * Redistribui as lições de containers de materiais para os módulos de conteúdo
+ * correspondentes, casando pelo número de módulo presente no título do material.
+ * Materiais sem correspondência permanecem num módulo residual.
+ */
+function categorizeMaterials(modules: ImsccModule[]): ImsccModule[] {
+  const contentModules = modules.filter((m) => !isMaterialsModule(m));
+  if (contentModules.length === 0) return modules; // nada para casar — mantém como está
+
+  // Mapa número-do-módulo → módulo de conteúdo (título com número, ou posição)
+  const byNumber = new Map<number, ImsccModule>();
+  contentModules.forEach((m, idx) => {
+    const n = moduleNumberOf(m.title) ?? idx + 1;
+    if (!byNumber.has(n)) byNumber.set(n, m);
+  });
+
+  const result: ImsccModule[] = [];
+  let movedAny = false;
+
+  for (const mod of modules) {
+    if (!isMaterialsModule(mod)) {
+      result.push(mod);
+      continue;
+    }
+    const leftover: ImsccLesson[] = [];
+    for (const lesson of mod.lessons) {
+      const n = moduleNumberOf(lesson.title);
+      const target = n != null ? byNumber.get(n) : undefined;
+      if (target && target !== mod) {
+        target.lessons.push(lesson);
+        movedAny = true;
+      } else {
+        leftover.push(lesson);
+      }
+    }
+    if (leftover.length > 0) result.push({ ...mod, lessons: leftover });
+  }
+
+  // Se nada casou, preserva a estrutura original (evita reordenar à toa)
+  return movedAny ? result : modules;
+}
+
 // ─── Parser principal ─────────────────────────────────────────────────────────
 
 export async function parseImscc(buffer: Buffer): Promise<ImsccParseResult> {
@@ -352,5 +412,6 @@ export async function parseImscc(buffer: Buffer): Promise<ImsccParseResult> {
     if (lessons.length > 0) modules.push({ title: "Conteúdo", lessons });
   }
 
-  return { courseTitle, modules, files };
+  // Redistribui PDFs/textos do container plano de materiais para os módulos certos
+  return { courseTitle, modules: categorizeMaterials(modules), files };
 }
