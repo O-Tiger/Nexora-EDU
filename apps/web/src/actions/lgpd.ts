@@ -53,18 +53,25 @@ export async function requestAccountDeletionAction(): Promise<{ ok: true } | { e
 
   // Anonymize immediately — LGPD art. 18 right to erasure
   const anonEmail = `removed-${userId}@nexora.deleted`;
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      name: "Usuário Removido",
-      email: anonEmail,
-      phone: null,
-      cpf: null,
-      avatarUrl: null,
-      consentedAt: null,
-      anonymizedAt: new Date(),
-    },
-  });
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: "Usuário Removido",
+        email: anonEmail,
+        phone: null,
+        cpf: null,
+        avatarUrl: null,
+        consentedAt: null,
+        anonymizedAt: new Date(),
+      },
+    }),
+    // Deactivate all memberships so the account can't log in
+    prisma.tenantMembership.updateMany({
+      where: { userId },
+      data: { active: false },
+    }),
+  ]);
 
   await createAuditLog(tenantId, userId, "lgpd.account_anonymized", `user:${userId}`, {
     requestedAt: new Date().toISOString(),
