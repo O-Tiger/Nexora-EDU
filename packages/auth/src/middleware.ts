@@ -2,7 +2,7 @@ import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import type { Role } from "@nexora/db";
 
-const PUBLIC_PATHS = ["/login", "/certificado", "/api/auth", "/_next", "/favicon"];
+const PUBLIC_PATHS = ["/login", "/certificado", "/p/", "/api/auth", "/_next", "/favicon", "/manifest"];
 
 const ROUTE_ROLES: { prefix: string; roles: Role[] }[] = [
   { prefix: "/admin", roles: ["ADMIN", "SUPER_ADMIN"] },

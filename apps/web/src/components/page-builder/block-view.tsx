@@ -1,6 +1,19 @@
 import Link from "next/link";
-import type { LayoutBlock } from "@nexora/validators";
+import type { LayoutBlock, FeatureIcon } from "@nexora/validators";
 import { sanitizeHtml } from "@/lib/sanitize";
+import { Carousel } from "./carousel";
+import {
+  BookOpen, GraduationCap, Award, Users, Check, Star, Rocket, Heart, Shield,
+  Clock, Calendar, Lightbulb, Target, Trophy, Globe, Laptop, Pencil, BarChart3,
+  MessageSquare, Gift, type LucideIcon,
+} from "lucide-react";
+
+const FEATURE_ICON_MAP: Record<FeatureIcon, LucideIcon> = {
+  book: BookOpen, graduation: GraduationCap, award: Award, users: Users, check: Check,
+  star: Star, rocket: Rocket, heart: Heart, shield: Shield, clock: Clock,
+  calendar: Calendar, lightbulb: Lightbulb, target: Target, trophy: Trophy, globe: Globe,
+  laptop: Laptop, pencil: Pencil, chart: BarChart3, message: MessageSquare, gift: Gift,
+};
 
 // Componente PURO (sem APIs server-only nem async) — usado tanto pelo
 // PageRenderer (server) quanto pelo preview do editor (client).
@@ -54,12 +67,20 @@ export function BlockView({ block, courses }: { block: LayoutBlock; courses: Cou
               <h2 className="mb-8 text-center text-2xl font-bold text-navy-900">{block.title}</h2>
             )}
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {block.items.map((item, i) => (
-                <div key={i} className="rounded-lg border border-navy-100 bg-white p-6">
-                  <h3 className="text-lg font-semibold text-navy-900">{item.title}</h3>
-                  {item.text && <p className="mt-2 text-sm text-navy-600">{item.text}</p>}
-                </div>
-              ))}
+              {block.items.map((item, i) => {
+                const Icon = item.icon ? FEATURE_ICON_MAP[item.icon] : null;
+                return (
+                  <div key={i} className="rounded-lg border border-navy-100 bg-white p-6">
+                    {Icon && (
+                      <span className="mb-3 inline-flex rounded-lg bg-teal-50 p-2.5 text-teal-600">
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                    )}
+                    <h3 className="text-lg font-semibold text-navy-900">{item.title}</h3>
+                    {item.text && <p className="mt-2 text-sm text-navy-600">{item.text}</p>}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -122,6 +143,19 @@ export function BlockView({ block, courses }: { block: LayoutBlock; courses: Cou
           <img src={block.src} alt={block.alt} className="mx-auto max-w-full rounded-lg" loading="lazy" />
         </section>
       );
+
+    case "carousel": {
+      const slides = block.slides.filter((s) => s.src);
+      if (slides.length === 0) return null;
+      return (
+        <section className="px-6 py-10">
+          {block.title && (
+            <h2 className="mb-6 text-center text-2xl font-bold text-navy-900">{block.title}</h2>
+          )}
+          <Carousel slides={slides} autoplay={block.autoplay} intervalMs={block.intervalMs} />
+        </section>
+      );
+    }
 
     case "spacer":
       return <div className={SPACER_H[block.size] ?? "h-12"} aria-hidden />;

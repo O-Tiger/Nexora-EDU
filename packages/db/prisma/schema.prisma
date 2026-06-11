@@ -351,6 +351,21 @@ model PageLayout {
   @@index([tenantId, pageType, publishedAt])
 }
 
+// ─── DOMÍNIOS ─────────────────────────────────────────────────────────────────
+
+/// Mapeia domínios/subdomínios públicos a um tenant, para hospedagem pública
+/// das páginas montadas no Page Builder (/p/[pageType]) sem exigir login.
+model TenantDomain {
+  id        String   @id @default(cuid())
+  tenantId  String
+  /// Host normalizado em minúsculas, sem protocolo nem porta (ex: "cursos.escola.com.br")
+  domain    String   @unique
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
 // ─── CERTIFICADOS ─────────────────────────────────────────────────────────────
 
 /// Template customizável de certificado por tenant (estilo page builder).

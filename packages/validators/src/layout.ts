@@ -32,15 +32,40 @@ const RichTextBlock = z.object({
   html: z.string().max(20000).default(""),
 });
 
+/// Ícones disponíveis para os itens do featureGrid (mapeados para lucide no render).
+export const FEATURE_ICONS = [
+  "book", "graduation", "award", "users", "check", "star", "rocket", "heart",
+  "shield", "clock", "calendar", "lightbulb", "target", "trophy", "globe",
+  "laptop", "pencil", "chart", "message", "gift",
+] as const;
+export const FeatureIconSchema = z.enum(FEATURE_ICONS);
+export type FeatureIcon = (typeof FEATURE_ICONS)[number];
+
 const FeatureItem = z.object({
   title: z.string().min(1).max(120),
   text: z.string().max(400).default(""),
+  icon: FeatureIconSchema.optional(),
 });
 
 const FeatureGridBlock = z.object({
   type: z.literal("featureGrid"),
   title: z.string().max(160).default(""),
   items: z.array(FeatureItem).min(1).max(12),
+});
+
+const CarouselSlide = z.object({
+  src: SafeHref.default(""),
+  alt: z.string().max(200).default(""),
+  caption: z.string().max(200).default(""),
+  href: SafeHref.default(""),
+});
+
+const CarouselBlock = z.object({
+  type: z.literal("carousel"),
+  title: z.string().max(160).default(""),
+  slides: z.array(CarouselSlide).min(1).max(12),
+  autoplay: z.boolean().default(false),
+  intervalMs: z.number().int().min(2000).max(15000).default(5000),
 });
 
 const CourseListBlock = z.object({
@@ -78,6 +103,7 @@ export const LayoutBlockDataSchema = z.discriminatedUnion("type", [
   CourseListBlock,
   CtaBlock,
   ImageBlock,
+  CarouselBlock,
   SpacerBlock,
 ]);
 

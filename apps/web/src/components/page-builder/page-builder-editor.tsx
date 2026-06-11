@@ -32,6 +32,7 @@ import {
 } from "@nexora/ui";
 import { GripVertical, Trash2, Plus, Eye, Pencil, Save, Rocket, History } from "lucide-react";
 import type { LayoutBlock, BlockType } from "@nexora/validators";
+import { FEATURE_ICONS } from "@nexora/validators";
 import { BLOCK_LABELS, BLOCK_PALETTE, makeBlock } from "./block-meta";
 import { BlockView } from "./block-view";
 import { saveDraftAction, publishLayoutAction, rollbackLayoutAction } from "@/actions/layouts";
@@ -330,6 +331,18 @@ function BlockForm({ block, onPatch }: { block: LayoutBlock; onPatch: (p: Record
                     const items = block.items.map((it, j) => (j === i ? { ...it, text: e.target.value } : it));
                     onPatch({ items });
                   }} />
+                  <select
+                    value={item.icon ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      const items = block.items.map((it, j) => (j === i ? { ...it, icon: v || undefined } : it));
+                      onPatch({ items });
+                    }}
+                    className="w-full rounded-md border border-navy-200 px-2 py-1.5 text-xs"
+                  >
+                    <option value="">Sem ícone</option>
+                    {FEATURE_ICONS.map((ic) => <option key={ic} value={ic}>{ic}</option>)}
+                  </select>
                 </div>
                 <button
                   onClick={() => onPatch({ items: block.items.filter((_, j) => j !== i) })}
@@ -381,6 +394,66 @@ function BlockForm({ block, onPatch }: { block: LayoutBlock; onPatch: (p: Record
         <>
           <Field label="URL da imagem"><Input value={block.src} placeholder="https://..." onChange={(e) => onPatch({ src: e.target.value })} /></Field>
           <Field label="Texto alternativo"><Input value={block.alt} maxLength={200} onChange={(e) => onPatch({ alt: e.target.value })} /></Field>
+        </>
+      );
+
+    case "carousel":
+      return (
+        <>
+          <Field label="Título (opcional)"><Input value={block.title} maxLength={160} onChange={(e) => onPatch({ title: e.target.value })} /></Field>
+          <div className="space-y-2">
+            {block.slides.map((slide, i) => (
+              <div key={i} className="space-y-1 rounded-md bg-navy-50 p-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-navy-500">Slide {i + 1}</span>
+                  <button
+                    onClick={() => onPatch({ slides: block.slides.filter((_, j) => j !== i) })}
+                    disabled={block.slides.length <= 1}
+                    className="text-navy-300 hover:text-red-500 disabled:opacity-30"
+                    aria-label="Remover slide"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <Input value={slide.src} placeholder="URL da imagem (https://...)" onChange={(e) => {
+                  const slides = block.slides.map((s, j) => (j === i ? { ...s, src: e.target.value } : s));
+                  onPatch({ slides });
+                }} />
+                <div className="grid grid-cols-2 gap-1">
+                  <Input value={slide.caption} placeholder="Legenda" maxLength={200} onChange={(e) => {
+                    const slides = block.slides.map((s, j) => (j === i ? { ...s, caption: e.target.value } : s));
+                    onPatch({ slides });
+                  }} />
+                  <Input value={slide.href} placeholder="Link (opcional)" onChange={(e) => {
+                    const slides = block.slides.map((s, j) => (j === i ? { ...s, href: e.target.value } : s));
+                    onPatch({ slides });
+                  }} />
+                </div>
+                <Input value={slide.alt} placeholder="Texto alternativo (acessibilidade)" maxLength={200} onChange={(e) => {
+                  const slides = block.slides.map((s, j) => (j === i ? { ...s, alt: e.target.value } : s));
+                  onPatch({ slides });
+                }} />
+              </div>
+            ))}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onPatch({ slides: [...block.slides, { src: "", alt: "", caption: "", href: "" }] })}
+              disabled={block.slides.length >= 12}
+            >
+              <Plus className="h-3.5 w-3.5" /> Slide
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex items-center gap-2 text-xs text-navy-600">
+              <input type="checkbox" checked={block.autoplay} onChange={(e) => onPatch({ autoplay: e.target.checked })} />
+              Autoplay
+            </label>
+            <Field label="Intervalo (ms)">
+              <Input type="number" min={2000} max={15000} step={500} value={block.intervalMs}
+                onChange={(e) => onPatch({ intervalMs: Math.max(2000, Math.min(15000, Number(e.target.value) || 5000)) })} />
+            </Field>
+          </div>
         </>
       );
 

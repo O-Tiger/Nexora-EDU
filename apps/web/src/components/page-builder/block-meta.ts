@@ -7,6 +7,7 @@ export const BLOCK_LABELS: Record<BlockType, string> = {
   courseList: "Lista de cursos",
   cta: "Chamada para ação",
   image: "Imagem",
+  carousel: "Carrossel",
   spacer: "Espaçador",
 };
 
@@ -17,6 +18,7 @@ export const BLOCK_PALETTE: BlockType[] = [
   "courseList",
   "cta",
   "image",
+  "carousel",
   "spacer",
 ];
 
@@ -42,6 +44,8 @@ export function makeBlock(type: BlockType): LayoutBlock {
       return { id, type, title: "Comece agora", text: "", buttonText: "Saiba mais", buttonHref: "", bgColor: "#0D9488" };
     case "image":
       return { id, type, src: "", alt: "" };
+    case "carousel":
+      return { id, type, title: "", slides: [{ src: "", alt: "", caption: "", href: "" }], autoplay: false, intervalMs: 5000 };
     case "spacer":
       return { id, type, size: "md" };
   }

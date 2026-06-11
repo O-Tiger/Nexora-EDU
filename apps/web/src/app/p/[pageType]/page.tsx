@@ -1,12 +1,14 @@
+import { headers } from "next/headers";
 import { auth } from "@nexora/auth";
 import { redirect, notFound } from "next/navigation";
 import { getPublishedBlocks } from "@nexora/db/src/queries/layouts";
+import { getTenantByDomain } from "@nexora/db/src/queries/domains";
 import { PageBlocksSchema, PAGE_TYPES, type PageType } from "@nexora/validators";
 import { PageRenderer } from "@/components/page-builder/page-renderer";
 
 // Renderiza a versão publicada de uma página montada no Page Builder.
-// TODO(fase-2): hospedagem pública precisa resolver o tenant por domínio/subdomínio.
-// Por enquanto exige sessão e usa o tenant ativo — evita servir página de outro tenant.
+// Resolução de tenant: 1) domínio público mapeado (TenantDomain) → acesso sem login;
+// 2) fallback para a sessão ativa (preview interno).
 export const dynamic = "force-dynamic";
 
 export default async function PublicPage({
@@ -18,9 +20,16 @@ export default async function PublicPage({
   if (!PAGE_TYPES.includes(pageType as PageType)) notFound();
   const pt = pageType as PageType;
 
-  const session = await auth();
-  if (!session) redirect("/login");
-  const tenantId = session.user.activeTenantId;
+  // 1) Tenta resolver pelo host público (domínio mapeado) — não exige login
+  const host = (await headers()).get("host") ?? "";
+  let tenantId = await getTenantByDomain(host);
+
+  // 2) Sem domínio mapeado: usa a sessão ativa (preview/uso interno)
+  if (!tenantId) {
+    const session = await auth();
+    if (!session) redirect("/login");
+    tenantId = session.user.activeTenantId;
+  }
 
   const raw = await getPublishedBlocks(tenantId, pt);
   const parsed = PageBlocksSchema.safeParse(raw ?? []);
