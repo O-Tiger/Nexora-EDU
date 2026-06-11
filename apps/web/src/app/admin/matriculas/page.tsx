@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { getEnrollmentsByTenant } from "@nexora/db/src/queries/enrollments-admin";
 import { prisma } from "@nexora/db";
 import {
-  EmptyState,
   Table,
   TableBody,
   TableCell,
@@ -12,9 +11,9 @@ import {
   TableHeader,
   TableRow,
 } from "@nexora/ui";
-import { Users } from "lucide-react";
 import { EnrollUserDialog } from "@/components/admin/enroll-user-dialog";
 import { EnrollmentStatusBadge } from "@/components/admin/enrollment-status-badge";
+import { EnrollmentsEmptyState } from "@/components/admin/enrollments-empty-state";
 
 export const metadata: Metadata = { title: "Matrículas" };
 
@@ -26,33 +25,36 @@ export default async function EnrollmentsPage() {
 
   const [enrollments, courses, students] = await Promise.all([
     getEnrollmentsByTenant(tenantId),
-    prisma.course.findMany({ where: { tenantId, status: "PUBLISHED" }, select: { id: true, title: true } }),
+    prisma.course.findMany({
+      where: { tenantId, status: "PUBLISHED" },
+      select: { id: true, title: true },
+    }),
     prisma.tenantMembership.findMany({
       where: { tenantId, role: "ALUNO", active: true },
       include: { user: { select: { id: true, name: true, email: true } } },
     }),
   ]);
 
+  const studentList = students.map((m) => ({
+    id: m.user.id,
+    name: m.user.name,
+    email: m.user.email,
+  }));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-navy-900">Matrículas</h1>
-          <p className="text-sm text-navy-500">{enrollments.length} matrícula{enrollments.length !== 1 ? "s" : ""}</p>
+          <p className="text-sm text-navy-500">
+            {enrollments.length} matrícula{enrollments.length !== 1 ? "s" : ""}
+          </p>
         </div>
-        <EnrollUserDialog
-          courses={courses}
-          students={students.map((m) => ({ id: m.user.id, name: m.user.name, email: m.user.email }))}
-        />
+        <EnrollUserDialog courses={courses} students={studentList} />
       </div>
 
       {enrollments.length === 0 ? (
-        <EmptyState
-          icon={<Users className="h-6 w-6" />}
-          title="Nenhuma matrícula ainda"
-          description="Matricule um aluno em um curso publicado."
-          action={{ label: "Matricular aluno", onClick: () => {} }}
-        />
+        <EnrollmentsEmptyState courses={courses} students={studentList} />
       ) : (
         <div className="rounded-lg border border-navy-100 bg-white">
           <Table>
@@ -75,7 +77,11 @@ export default async function EnrollmentsPage() {
                   </TableCell>
                   <TableCell>
                     {e.expiresAt ? (
-                      <span className={new Date(e.expiresAt) < new Date() ? "text-red-600" : ""}>
+                      <span
+                        className={
+                          new Date(e.expiresAt) < new Date() ? "text-red-600" : ""
+                        }
+                      >
                         {new Date(e.expiresAt).toLocaleDateString("pt-BR")}
                       </span>
                     ) : (
