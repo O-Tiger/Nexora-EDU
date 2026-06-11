@@ -6,80 +6,153 @@ async function getPuppeteer() {
   return puppeteer.default;
 }
 
-interface CertificateData {
+export interface CertificateData {
   studentName: string;
   courseName: string;
   hoursTotal: number;
   issuedAt: Date;
   code: string;
   institutionName: string;
+  studentCpf?: string | null;
 }
 
-function buildCertificateHtml(data: CertificateData): string {
-  const date = data.issuedAt.toLocaleDateString("pt-BR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
+export interface CertificateSignature {
+  name: string;
+  role: string;
+  document?: string;
+}
+
+export interface CertificateTemplateConfig {
+  institutionName: string;
+  subtitle?: string | null;
+  title: string;
+  bodyTemplate: string;
+  signatures: CertificateSignature[];
+  logoUrl?: string | null;
+  city?: string | null;
+  accentColor: string;
+}
+
+/** Template padrão usado quando o tenant ainda não customizou. */
+export function defaultCertificateTemplate(institutionName: string): CertificateTemplateConfig {
+  return {
+    institutionName,
+    subtitle: null,
+    title: "CERTIFICADO",
+    bodyTemplate:
+      "{{cpf}}concluiu o curso de <strong>{{course}}</strong>, promovido por esta entidade em {{date}}, com carga horária total de {{hours}} horas.",
+    signatures: [{ name: "", role: "Diretor(a) Geral" }, { name: "", role: "Secretário(a)" }],
+    logoUrl: null,
+    city: null,
+    accentColor: "#0D9488",
+  };
+}
+
+function esc(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+}
+
+function renderTemplateString(tpl: string, vars: Record<string, string>): string {
+  return tpl.replace(/\{\{(\w+)\}\}/g, (_, k: string) => (k in vars ? vars[k]! : ""));
+}
+
+export function buildCertificateHtml(data: CertificateData, tpl: CertificateTemplateConfig): string {
+  const date = data.issuedAt.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+  const accent = tpl.accentColor || "#0D9488";
+
+  const body = renderTemplateString(tpl.bodyTemplate, {
+    name: esc(data.studentName),
+    course: esc(data.courseName),
+    hours: String(data.hoursTotal),
+    date,
+    code: esc(data.code),
+    city: esc(tpl.city ?? ""),
+    cpf: data.studentCpf ? `CPF ${esc(data.studentCpf)} ` : "",
   });
 
+  const cityLine = tpl.city ? `${esc(tpl.city)}, ${date}.` : `${date}.`;
+
+  const sigs = (tpl.signatures ?? []).filter((s) => s.role || s.name);
+  const sigHtml = sigs.length
+    ? `<div class="sigs">${sigs.map((s) => `
+        <div class="sig">
+          <div class="line"></div>
+          ${s.name ? `<div class="sig-name">${esc(s.name)}</div>` : ""}
+          ${s.document ? `<div class="sig-doc">${esc(s.document)}</div>` : ""}
+          <div class="sig-role">${esc(s.role)}</div>
+        </div>`).join("")}</div>`
+    : "";
+
   return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
+<html lang="pt-BR"><head><meta charset="UTF-8">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    width: 1123px; height: 794px;
-    font-family: Georgia, serif;
-    background: linear-gradient(135deg, #1A3A5C 0%, #0D9488 100%);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .cert {
-    background: white;
-    width: 1040px; height: 710px;
-    border-radius: 16px;
-    padding: 60px 80px;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    text-align: center;
-    position: relative;
-    border: 8px solid #0D9488;
-  }
-  .institution { font-size: 14px; color: #64748b; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 16px; }
-  .title { font-size: 42px; color: #1A3A5C; font-weight: bold; margin-bottom: 8px; }
-  .subtitle { font-size: 18px; color: #475569; margin-bottom: 40px; }
-  .certifies { font-size: 14px; color: #64748b; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; }
-  .student { font-size: 36px; color: #0D9488; font-weight: bold; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 24px; min-width: 500px; }
-  .course-label { font-size: 14px; color: #64748b; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
-  .course { font-size: 22px; color: #1A3A5C; font-weight: bold; margin-bottom: 8px; }
-  .hours { font-size: 14px; color: #64748b; margin-bottom: 40px; }
-  .date { font-size: 14px; color: #64748b; margin-bottom: 20px; }
-  .code { font-size: 11px; color: #94a3b8; font-family: monospace; }
-</style>
-</head>
+  body { width: 1123px; height: 794px; font-family: Georgia, 'Times New Roman', serif;
+    background: #fff; display: flex; align-items: center; justify-content: center; }
+  .cert { width: 1083px; height: 754px; padding: 48px 72px; border: 10px solid ${accent};
+    display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; }
+  .logo { max-height: 90px; margin-bottom: 12px; }
+  .institution { font-size: 20px; color: #1a2b3c; font-weight: bold; }
+  .subtitle { font-size: 12px; color: #64748b; margin-top: 6px; max-width: 760px; line-height: 1.4; }
+  .title { font-size: 40px; color: ${accent}; font-weight: bold; letter-spacing: 2px; margin: 24px 0 18px; }
+  .certifies { font-size: 14px; color: #64748b; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+  .student { font-size: 34px; color: #1a2b3c; font-weight: bold; margin-bottom: 22px; }
+  .body { font-size: 17px; color: #334155; line-height: 1.7; max-width: 820px; margin-bottom: 36px; }
+  .city { font-size: 15px; color: #334155; margin-bottom: 48px; }
+  .sigs { display: flex; gap: 64px; justify-content: center; margin-top: auto; }
+  .sig { min-width: 220px; }
+  .sig .line { border-top: 1px solid #334155; margin-bottom: 6px; }
+  .sig-name { font-size: 14px; font-weight: bold; color: #1a2b3c; }
+  .sig-doc { font-size: 11px; color: #64748b; }
+  .sig-role { font-size: 12px; color: #475569; }
+  .code { position: absolute; bottom: 14px; right: 24px; font-size: 10px; color: #94a3b8; font-family: monospace; }
+</style></head>
 <body>
 <div class="cert">
-  <p class="institution">${data.institutionName}</p>
-  <h1 class="title">Certificado de Conclusão</h1>
-  <p class="certifies">Certificamos que</p>
-  <p class="student">${data.studentName}</p>
-  <p class="course-label">concluiu com êxito o curso</p>
-  <p class="course">${data.courseName}</p>
-  <p class="hours">Carga horária: ${data.hoursTotal}h</p>
-  <p class="date">${date}</p>
-  <p class="code">Código de validação: ${data.code}</p>
+  ${tpl.logoUrl ? `<img class="logo" src="${esc(tpl.logoUrl)}" alt="logo" />` : ""}
+  <div class="institution">${esc(tpl.institutionName)}</div>
+  ${tpl.subtitle ? `<div class="subtitle">${esc(tpl.subtitle)}</div>` : ""}
+  <h1 class="title">${esc(tpl.title)}</h1>
+  <p class="certifies">Certifica que</p>
+  <p class="student">${esc(data.studentName)}</p>
+  <p class="body">${body}</p>
+  <p class="city">${cityLine}</p>
+  ${sigHtml}
+  <span class="code">Validação: ${esc(data.code)}</span>
 </div>
-</body>
-</html>`;
+</body></html>`;
+}
+
+/** Carrega o template do tenant ou retorna o padrão. */
+export async function getCertificateTemplate(
+  tenantId: string,
+  fallbackInstitution: string,
+): Promise<CertificateTemplateConfig> {
+  const row = await prisma.certificateTemplate.findUnique({ where: { tenantId } });
+  if (!row) return defaultCertificateTemplate(fallbackInstitution);
+  return {
+    institutionName: row.institutionName,
+    subtitle: row.subtitle,
+    title: row.title,
+    bodyTemplate: row.bodyTemplate,
+    signatures: (row.signatures as unknown as CertificateSignature[]) ?? [],
+    logoUrl: row.logoUrl,
+    city: row.city,
+    accentColor: row.accentColor,
+  };
 }
 
 /**
  * Gera o PDF do certificado e retorna o buffer.
  * Chamado apenas server-side (Node.js runtime).
  */
-export async function generateCertificatePdf(data: CertificateData): Promise<Buffer> {
+export async function generateCertificatePdf(
+  data: CertificateData,
+  tpl?: CertificateTemplateConfig,
+): Promise<Buffer> {
   const puppeteer = await getPuppeteer();
   const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || undefined;
+  const template = tpl ?? defaultCertificateTemplate(data.institutionName);
 
   const browser = await puppeteer.launch({
     headless: true,
@@ -89,7 +162,7 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
 
   try {
     const page = await browser.newPage();
-    await page.setContent(buildCertificateHtml(data), { waitUntil: "networkidle0" });
+    await page.setContent(buildCertificateHtml(data, template), { waitUntil: "networkidle0" });
     await page.setViewport({ width: 1123, height: 794 });
 
     const pdfBuffer = await page.pdf({

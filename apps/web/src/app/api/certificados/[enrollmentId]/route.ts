@@ -5,6 +5,7 @@ import {
   checkCourseCompletion,
   generateCertificatePdf,
   getOrCreateCertificate,
+  getCertificateTemplate,
 } from "@/lib/certificate";
 import { getPresignedDownloadUrl } from "@/lib/r2";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -52,14 +53,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ enrollm
 
   // Gerar PDF, fazer upload para R2 e salvar a chave
   try {
+    const fallbackInstitution = session.user.activeTenantId === "inst_a" ? "Faculdade Nexora" : "Colégio Nexora";
+    const template = await getCertificateTemplate(session.user.activeTenantId, fallbackInstitution);
     const pdfBuffer = await generateCertificatePdf({
       studentName: user.name,
       courseName: enrollment.course.title,
       hoursTotal: enrollment.course.hoursTotal,
       issuedAt: certificate.issuedAt,
       code: certificate.code,
-      institutionName: session.user.activeTenantId === "inst_a" ? "Faculdade Nexora" : "Colégio Nexora",
-    });
+      institutionName: template.institutionName,
+      studentCpf: user.cpf,
+    }, template);
 
     const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID;
     const accessKey = process.env.CLOUDFLARE_R2_ACCESS_KEY;

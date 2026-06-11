@@ -9,6 +9,16 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 3 — Pedagógico & Certificados)
+- `packages/db`: models `Disciplina` (auto-relação `parentId` = frente), `TurmaDisciplina`, `Grade`, `Attendance`, `CertificateTemplate` + enum `GradeKind` + migrations
+- **Disciplinas & frentes**: CRUD em `/admin/secretaria/disciplinas` — disciplinas com sub-divisões graduadas separadamente (Matemática 1/2/3)
+- **Notas & frequência**: atribuição de disciplinas à turma + grade de lançamento com autosave (AVA/RECP por trimestre + prova final + faltas) em `/admin/secretaria/turmas/[id]/notas`
+- **Gerador de boletim**: engine modelado no padrão trimestral (total, prova final, média, resultado, % freq); geração em **PDF** (puppeteer), **HTML** e **Word (.doc)** por turma inteira ou aluno individual em `/admin/secretaria/boletins`
+- **Gerador de certificado customizável** (Faculdade): `CertificateTemplate` por tenant — instituição, subtítulo/credenciamento, título, corpo com `{{placeholders}}`, até 4 assinaturas, logo, cidade, cor de destaque; editor em `/admin/certificados` com preview HTML e PDF de exemplo; render usado no download do aluno (PDF obrigatório)
+- **Workspace switcher**: AdminSidebar separa Faculdade (EAD) e Secretaria Escolar via dropdown
+- `apps/web`: botão de exclusão de turma com guarda de alunos matriculados
+- `fix(import)`: materiais de cartuchos `.imscc` (container plano) redistribuídos aos módulos corretos pelo número no título
+
 ### Added (Fase 3 — Secretaria)
 - `packages/db`: models `Unidade`, `AnoLetivo`, `Turma`, `TurmaEnrollment`, `Guardian` + enums `Etapa` (EI/EF1/EF2/EM), `Periodo`, `UnidadeGender`, `GuardianRelationship`, `TurmaEnrollmentStatus` + migration manual
 - `packages/validators`: schemas Zod `UnidadeSchema`, `AnoLetivoSchema`, `TurmaSchema`, `TurmaEnrollmentSchema`, `GuardianSchema`; `buildTurmaCode()` para geração de código configurável por escola (ex: `EFAI3ACOL`, `EF3A`); `ETAPA_LABELS`, `ETAPA_ANO_RANGE`

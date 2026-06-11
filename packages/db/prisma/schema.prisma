@@ -353,6 +353,31 @@ model PageLayout {
 
 // ─── CERTIFICADOS ─────────────────────────────────────────────────────────────
 
+/// Template customizável de certificado por tenant (estilo page builder).
+/// Os textos usam {{placeholders}}: {{name}}, {{course}}, {{hours}}, {{date}},
+/// {{cpf}}, {{code}}, {{city}}.
+model CertificateTemplate {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+  /// Nome da instituição (linha de cabeçalho)
+  institutionName String
+  /// Texto de credenciamento/subtítulo (ex: portaria de credenciamento)
+  subtitle        String?
+  title           String   @default("CERTIFICADO")
+  /// Corpo do certificado com {{placeholders}}
+  bodyTemplate    String
+  /// Assinaturas: JSON array de { name, role, document }
+  signatures      Json
+  /// URL do logo (R2 ou externa)
+  logoUrl         String?
+  /// Cidade da linha "Cidade, data"
+  city            String?
+  /// Cor de destaque (hex)
+  accentColor     String   @default("#0D9488")
+  updatedAt       DateTime @updatedAt
+  updatedBy       String
+}
+
 /// Certificado emitido ao concluir um curso.
 /// O código único é usado para validação pública em /certificado/{code}.
 model Certificate {
