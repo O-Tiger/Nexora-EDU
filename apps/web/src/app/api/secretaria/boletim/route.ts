@@ -41,6 +41,7 @@ export async function GET(req: Request) {
     name: process.env.NEXT_PUBLIC_SCHOOL_NAME || BRAND.name,
     ...(process.env.SCHOOL_CNPJ && { cnpj: process.env.SCHOOL_CNPJ }),
     ...(process.env.SCHOOL_ADDRESS && { address: process.env.SCHOOL_ADDRESS }),
+    ...(process.env.SCHOOL_LOGO_URL && { logoUrl: process.env.SCHOOL_LOGO_URL }),
   });
 
   let rendered;

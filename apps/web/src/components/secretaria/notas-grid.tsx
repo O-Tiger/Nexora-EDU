@@ -21,15 +21,13 @@ interface Props {
   attendances: AttCell[];
 }
 
-// Colunas de nota: período + tipo
+// Colunas de nota: 1ª/2ª/3ª avaliação (trimestres) + recuperação única + prova final
 const COLUMNS: { key: string; label: string; period: number; kind: GradeKind }[] = [
   { key: "1-AVA", label: "1ª AVA", period: 1, kind: "AVA" },
-  { key: "1-RECP", label: "1ª REC", period: 1, kind: "RECP" },
   { key: "2-AVA", label: "2ª AVA", period: 2, kind: "AVA" },
-  { key: "2-RECP", label: "2ª REC", period: 2, kind: "RECP" },
   { key: "3-AVA", label: "3ª AVA", period: 3, kind: "AVA" },
-  { key: "3-RECP", label: "3ª REC", period: 3, kind: "RECP" },
-  { key: "0-FINAL", label: "Final", period: 0, kind: "FINAL" },
+  { key: "0-RECP", label: "REC", period: 0, kind: "RECP" },
+  { key: "0-FINAL", label: "Prova Final", period: 0, kind: "FINAL" },
 ];
 
 export function NotasGrid(props: Props) {
