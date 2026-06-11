@@ -9,6 +9,17 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 3 — Secretaria)
+- `packages/db`: models `Unidade`, `AnoLetivo`, `Turma`, `TurmaEnrollment`, `Guardian` + enums `Etapa` (EI/EF1/EF2/EM), `Periodo`, `UnidadeGender`, `GuardianRelationship`, `TurmaEnrollmentStatus` + migration manual
+- `packages/validators`: schemas Zod `UnidadeSchema`, `AnoLetivoSchema`, `TurmaSchema`, `TurmaEnrollmentSchema`, `GuardianSchema`; `buildTurmaCode()` para geração de código configurável por escola (ex: `EFAI3ACOL`, `EF3A`); `ETAPA_LABELS`, `ETAPA_ANO_RANGE`
+- `packages/db/src/queries/secretaria.ts`: queries CRUD completas (unidades, anos letivos, turmas, matrículas K-12, responsáveis, overview stats)
+- `apps/web/src/actions/secretaria.ts`: server actions com validação, auditlog e revalidação de paths
+- `apps/web/src/app/admin/secretaria`: página overview com cards de stats, lista de anos letivos com controle de status (PLANEJADO → EM_ANDAMENTO → ENCERRADO), lista de unidades
+- `apps/web/src/app/admin/secretaria/unidades/[id]`: turmas agrupadas por etapa, filtro por ano letivo, capacidade ocupada/total, link para detalhe da turma
+- `apps/web/src/app/admin/secretaria/turmas/[id]`: lista de alunos matriculados, matrícula de novos alunos com busca, cancelamento de matrícula via modal
+- `apps/web/src/app/admin/secretaria/alunos/[studentId]`: ficha do aluno — dados pessoais, responsáveis (CRUD), histórico de turmas por ano letivo
+- `AdminSidebar`: link "Secretaria" adicionado
+
 ### Added (Fase 2 — WCAG / PWA / i18n)
 - **WCAG 2.1 AA**: skip-to-content link em todas as páginas (SC 2.4.1); `id="main-content"` + `tabIndex={-1}` em `<main>`; `aria-label` em `<aside>` e `<nav>`; `aria-current="page"` nos links de navegação ativos; `aria-hidden="true"` em ícones decorativos; `focus-visible` global com anel teal; `prefers-reduced-motion` desativa animações; `focus-ring` utility aplicado aos links de navegação
 - **PWA**: `public/manifest.webmanifest` (name, icons 192/512, start_url, display standalone, shortcuts); meta tags `theme-color`, `viewport`, `apple-mobile-web-app-capable` no root layout via `Viewport` export; `@ducanh2912/next-pwa` integrado ao `next.config.ts` (desabilitado em dev, Workbox em produção)

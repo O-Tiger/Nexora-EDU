@@ -31,14 +31,15 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships    TenantMembership[]
-  auditLogs      AuditLog[]
-  onboarding     UserOnboarding[]
-  announcements  Announcement[]
-  forumThreads   ForumThread[]  @relation("ForumThreadAuthor")
-  forumReplies   ForumReply[]   @relation("ForumReplyAuthor")
-  sentMessages   DirectMessage[] @relation("DMSender")
-  receivedMessages DirectMessage[] @relation("DMReceiver")
+  memberships      TenantMembership[]
+  auditLogs        AuditLog[]
+  onboarding       UserOnboarding[]
+  announcements    Announcement[]
+  forumThreads     ForumThread[]    @relation("ForumThreadAuthor")
+  forumReplies     ForumReply[]     @relation("ForumReplyAuthor")
+  sentMessages     DirectMessage[]  @relation("DMSender")
+  receivedMessages DirectMessage[]  @relation("DMReceiver")
+  turmaEnrollments TurmaEnrollment[] @relation("StudentTurmaEnrollments")
 
   @@index([email])
 }
@@ -575,4 +576,164 @@ enum DataExportStatus {
   PENDING
   READY
   EXPIRED
+}
+
+// ─── SECRETARIA ───────────────────────────────────────────────────────────────
+
+/// Unidade física da escola (ex: "Colinas", "Caminhos", "Principal").
+/// Escolas com uma única unidade criam uma unidade "Principal".
+/// A unidade determina a identidade de gênero para escolas single-sex.
+model Unidade {
+  id        String        @id @default(cuid())
+  tenantId  String
+  /// Nome exibido: "Colinas", "Caminhos", "Principal"
+  name      String
+  /// Código curto usado nos códigos de turma: "COL", "CAM", ""
+  code      String
+  gender    UnidadeGender @default(MISTO)
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+
+  turmas    Turma[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+}
+
+enum UnidadeGender {
+  MASCULINO
+  FEMININO
+  MISTO
+}
+
+/// Ano letivo. Todas as turmas pertencem a um ano letivo.
+model AnoLetivo {
+  id        String          @id @default(cuid())
+  tenantId  String
+  year      Int
+  startDate DateTime
+  endDate   DateTime
+  status    AnoLetivoStatus @default(PLANEJADO)
+  createdAt DateTime        @default(now())
+
+  turmas    Turma[]
+
+  @@unique([tenantId, year])
+  @@index([tenantId, status])
+}
+
+enum AnoLetivoStatus {
+  PLANEJADO
+  EM_ANDAMENTO
+  ENCERRADO
+}
+
+/// Turma de uma unidade em um ano letivo.
+/// O código é gerado automaticamente a partir da etapa + ano + letra + unidade:
+///   EFAICCC → "EFAICCC1A" (anos 1-2, misto)
+///   EFAI    → "EFAI3ACOL"
+///   EFAF    → "EFAF6BCAM"
+///   EM      → "EM2BCOL"
+/// Para escolas comuns (unidade code = ""), o código omite o sufixo: "EFAI3A"
+model Turma {
+  id          String   @id @default(cuid())
+  tenantId    String
+  unidadeId   String
+  anoLetivoId String
+  /// Código único dentro do ano letivo: "EFAI3ACOL", "EM2BCAM", "EFAICCC1A"
+  code        String
+  etapa       Etapa
+  /// Ano dentro da etapa: 1-5 (EFAI/EFAICCC), 6-9 (EFAF), 1-3 (EM)
+  ano         Int
+  /// Letra da turma: "A", "B", "C" ...
+  letra       String
+  periodo     Periodo  @default(MANHA)
+  maxStudents Int      @default(35)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  unidade     Unidade         @relation(fields: [unidadeId], references: [id])
+  anoLetivo   AnoLetivo       @relation(fields: [anoLetivoId], references: [id])
+  enrollments TurmaEnrollment[]
+
+  @@unique([tenantId, anoLetivoId, code])
+  @@index([tenantId, anoLetivoId])
+  @@index([unidadeId, etapa])
+}
+
+enum Etapa {
+  /// Educação Infantil
+  EI
+  /// Ensino Fundamental Anos Iniciais (séries 1-5)
+  EF1
+  /// Ensino Fundamental Anos Finais (séries 6-9)
+  EF2
+  /// Ensino Médio (anos 1-3)
+  EM
+}
+
+enum Periodo {
+  MANHA
+  TARDE
+  NOITE
+  INTEGRAL
+}
+
+/// Matrícula de um aluno em uma turma (Secretaria, distinto de Enrollment EAD).
+model TurmaEnrollment {
+  id          String                @id @default(cuid())
+  tenantId    String
+  studentId   String
+  turmaId     String
+  /// Denormalizado para facilitar consultas históricas por ano letivo
+  anoLetivoId String
+  status      TurmaEnrollmentStatus @default(ATIVA)
+  enrolledAt  DateTime              @default(now())
+  cancelledAt DateTime?
+  notes       String?
+
+  turma   Turma @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  student User  @relation("StudentTurmaEnrollments", fields: [studentId], references: [id])
+
+  /// Um aluno só pode estar em uma turma por ano letivo
+  @@unique([studentId, anoLetivoId])
+  @@index([tenantId, turmaId])
+  @@index([tenantId, anoLetivoId])
+  @@index([studentId])
+}
+
+enum TurmaEnrollmentStatus {
+  ATIVA
+  TRANSFERIDA
+  CANCELADA
+  CONCLUIDA
+}
+
+/// Responsável/guardian de um aluno menor de idade.
+/// userId é opcional: quando preenchido, o responsável tem acesso ao portal.
+model Guardian {
+  id           String               @id @default(cuid())
+  tenantId     String
+  /// userId do aluno (User)
+  studentId    String
+  name         String
+  email        String?
+  phone        String?
+  cpf          String?
+  relationship GuardianRelationship
+  isPrimary    Boolean              @default(false)
+  /// Quando preenchido, este responsável tem login no portal
+  userId       String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([tenantId, studentId])
+  @@index([studentId])
+}
+
+enum GuardianRelationship {
+  PAI
+  MAE
+  RESPONSAVEL
+  OUTRO
 }
