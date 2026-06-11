@@ -8,6 +8,7 @@ import { getTurmaById } from "@nexora/db/src/queries/secretaria";
 import { ETAPA_LABELS, type Etapa } from "@nexora/validators";
 import { EnrollStudentForm } from "@/components/secretaria/enroll-student-form";
 import { TurmaStudentRow } from "@/components/secretaria/turma-student-row";
+import { TurmaDeleteButton } from "@/components/secretaria/turma-delete-button";
 import { prisma } from "@nexora/db";
 
 export const metadata: Metadata = { title: "Turma" };
@@ -65,6 +66,13 @@ export default async function TurmaDetailPage({ params }: { params: Promise<{ id
             {turma.unidade.name} · {turma.anoLetivo.year}
           </p>
         </div>
+        <TurmaDeleteButton
+          turmaId={id}
+          code={turma.code}
+          unidadeId={turma.unidadeId}
+          anoLetivoId={turma.anoLetivoId}
+          hasStudents={turma.enrollments.length > 0}
+        />
       </div>
 
       {!isFull && (

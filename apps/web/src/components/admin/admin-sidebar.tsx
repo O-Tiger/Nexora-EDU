@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Users, GraduationCap, LayoutDashboard, LogOut, Menu, Upload, X, Layout, MessageSquare, School } from "lucide-react";
+import {
+  BookOpen, Users, GraduationCap, LayoutDashboard, LogOut, Menu, Upload, X,
+  Layout, MessageSquare, School, Award, FileText, Building2, ChevronsUpDown, Check,
+} from "lucide-react";
 import { cn, Badge, Button, BRAND } from "@nexora/ui";
 import { signOut } from "next-auth/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Role } from "@nexora/db";
 
 const tenantLabels: Record<string, string> = {
@@ -19,16 +22,40 @@ const roleLabels: Record<string, string> = {
   COORDENADOR: "Coordenador",
 };
 
-const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/cursos", label: "Cursos", icon: BookOpen },
-  { href: "/admin/alunos", label: "Alunos", icon: GraduationCap },
-  { href: "/admin/matriculas", label: "Matrículas", icon: Users },
-  { href: "/admin/paginas", label: "Páginas", icon: Layout },
-  { href: "/admin/comunicacao", label: "Comunicação", icon: MessageSquare },
-  { href: "/admin/secretaria", label: "Secretaria", icon: School },
-  { href: "/admin/importar", label: "Importar curso", icon: Upload },
-];
+type Workspace = "ead" | "secretaria";
+
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; exact?: boolean };
+
+const WORKSPACES: Record<Workspace, { label: string; icon: typeof LayoutDashboard; items: NavItem[] }> = {
+  ead: {
+    label: "Faculdade (EAD)",
+    icon: BookOpen,
+    items: [
+      { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+      { href: "/admin/cursos", label: "Cursos", icon: BookOpen },
+      { href: "/admin/alunos", label: "Alunos", icon: GraduationCap },
+      { href: "/admin/matriculas", label: "Matrículas", icon: Users },
+      { href: "/admin/certificados", label: "Certificados", icon: Award },
+      { href: "/admin/paginas", label: "Páginas", icon: Layout },
+      { href: "/admin/comunicacao", label: "Comunicação", icon: MessageSquare },
+      { href: "/admin/importar", label: "Importar curso", icon: Upload },
+    ],
+  },
+  secretaria: {
+    label: "Secretaria Escolar",
+    icon: School,
+    items: [
+      { href: "/admin/secretaria", label: "Visão geral", icon: Building2, exact: true },
+      { href: "/admin/secretaria/unidades", label: "Unidades & Turmas", icon: School },
+      { href: "/admin/secretaria/boletins", label: "Boletins", icon: FileText },
+      { href: "/admin/alunos", label: "Alunos", icon: GraduationCap },
+    ],
+  },
+};
+
+function detectWorkspace(pathname: string): Workspace {
+  return pathname.startsWith("/admin/secretaria") ? "secretaria" : "ead";
+}
 
 interface Props {
   user: { name: string; role: Role; tenantId: string };
@@ -37,12 +64,64 @@ interface Props {
 export function AdminSidebar({ user }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [workspace, setWorkspace] = useState<Workspace>(() => detectWorkspace(pathname));
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+
+  // Sync workspace with current route (e.g. when navigating via links)
+  useEffect(() => {
+    setWorkspace(detectWorkspace(pathname));
+  }, [pathname]);
+
+  const navItems = WORKSPACES[workspace].items;
 
   const sidebar = (
     <aside aria-label="Menu lateral" className="flex h-full w-64 flex-col border-r border-navy-100 bg-white">
       <div className="border-b border-navy-100 px-5 py-4">
         <p className="text-lg font-bold text-navy-900">{BRAND.name}</p>
         <p className="text-xs text-navy-400">{tenantLabels[user.tenantId] ?? user.tenantId}</p>
+      </div>
+
+      {/* Workspace switcher */}
+      <div className="relative border-b border-navy-100 px-3 py-2">
+        <button
+          onClick={() => setSwitcherOpen((v) => !v)}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-navy-700 hover:bg-navy-50 focus-ring"
+          aria-haspopup="listbox"
+          aria-expanded={switcherOpen}
+        >
+          {(() => { const Icon = WORKSPACES[workspace].icon; return <Icon className="h-4 w-4 shrink-0 text-teal-600" aria-hidden="true" />; })()}
+          <span className="flex-1 text-left">{WORKSPACES[workspace].label}</span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 text-navy-300" aria-hidden="true" />
+        </button>
+
+        {switcherOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setSwitcherOpen(false)} />
+            <div className="absolute left-3 right-3 z-20 mt-1 rounded-md border border-navy-100 bg-white shadow-lg" role="listbox">
+              {(Object.keys(WORKSPACES) as Workspace[]).map((ws) => {
+                const Icon = WORKSPACES[ws].icon;
+                const active = ws === workspace;
+                return (
+                  <Link
+                    key={ws}
+                    href={WORKSPACES[ws].items[0]!.href as never}
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => { setWorkspace(ws); setSwitcherOpen(false); setOpen(false); }}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 text-sm transition-colors first:rounded-t-md last:rounded-b-md",
+                      active ? "bg-teal-50 text-teal-700" : "text-navy-600 hover:bg-navy-50",
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="flex-1">{WORKSPACES[ws].label}</span>
+                    {active && <Check className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                  </Link>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       <nav aria-label="Navegação administrativa" className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
