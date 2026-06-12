@@ -697,6 +697,8 @@ model Turma {
   enrollments TurmaEnrollment[]
   disciplinas TurmaDisciplina[]
   registros   RegistroAula[]
+  horarios    HorarioAula[]
+  eventos     EventoCalendario[]
 
   @@unique([tenantId, anoLetivoId, code])
   @@index([tenantId, anoLetivoId])
@@ -805,6 +807,7 @@ model Disciplina {
   grades           Grade[]
   attendances      Attendance[]
   registros        RegistroAula[]
+  horarios         HorarioAula[]
 
   @@index([tenantId, parentId])
   @@index([tenantId, active])
@@ -911,4 +914,49 @@ model PresencaAluno {
 
   @@unique([registroId, enrollmentId])
   @@index([enrollmentId])
+}
+
+/// Grade de horários: uma aula recorrente da turma num dia da semana e ordem.
+model HorarioAula {
+  id           String @id @default(cuid())
+  tenantId     String
+  turmaId      String
+  /// 1 = segunda … 7 = domingo
+  diaSemana    Int
+  /// Ordem da aula no dia (1ª, 2ª, …)
+  ordem        Int
+  disciplinaId String
+
+  turma      Turma      @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([turmaId, diaSemana, ordem])
+  @@index([tenantId, turmaId])
+}
+
+/// Evento do calendário da turma: prova, simulado, olimpíada, etc.
+model EventoCalendario {
+  id          String     @id @default(cuid())
+  tenantId    String
+  turmaId     String
+  data        DateTime
+  tipo        TipoEvento
+  titulo      String
+  descricao   String?
+  createdAt   DateTime   @default(now())
+
+  turma Turma @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, turmaId, data])
+}
+
+enum TipoEvento {
+  PROVA
+  SIMULADO
+  OLIMPIADA
+  TRABALHO
+  REUNIAO
+  PASSEIO
+  FERIADO
+  OUTRO
 }
