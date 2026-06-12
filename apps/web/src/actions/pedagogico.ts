@@ -7,7 +7,7 @@ import { z } from "zod";
 import {
   createDisciplina, deleteDisciplina, setTurmaDisciplinas,
   upsertGrade, upsertAttendance,
-  updateDisciplinaColor, setTurmaDisciplinaProfessor,
+  updateDisciplinaColor, setTurmaDisciplinaProfessor, setMateriaColors,
 } from "@nexora/db/src/queries/pedagogico";
 import type { GradeKind } from "@nexora/db";
 
@@ -57,6 +57,15 @@ export async function setDisciplinaColorAction(id: string, color: string | null)
   await updateDisciplinaColor(id, tenantId, color);
   revalidatePath("/admin/secretaria/disciplinas");
   return { success: true };
+}
+
+/** Define a cor base da matéria e gera variantes (tons) nas frentes. */
+export async function setMateriaColorAction(parentId: string, color: string) {
+  const { tenantId } = await requireStaff();
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) return { error: "Cor inválida" };
+  const colors = await setMateriaColors(tenantId, parentId, color);
+  revalidatePath("/admin/secretaria/disciplinas");
+  return { success: true, colors };
 }
 
 export async function setTurmaDisciplinaProfessorAction(

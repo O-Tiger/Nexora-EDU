@@ -3,7 +3,7 @@
 import { useState, useTransition, useMemo } from "react";
 import { Button, Input, toast } from "@nexora/ui";
 import { Plus, Trash2, CornerDownRight, BookMarked, ArrowDownUp } from "lucide-react";
-import { createDisciplinaAction, deleteDisciplinaAction, setDisciplinaColorAction } from "@/actions/pedagogico";
+import { createDisciplinaAction, deleteDisciplinaAction, setDisciplinaColorAction, setMateriaColorAction } from "@/actions/pedagogico";
 import { useConfirm } from "@/hooks/use-confirm";
 
 interface Frente { id: string; name: string; position: number; color: string | null }
@@ -36,9 +36,26 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
     }
   }, [disciplinas, sort]);
 
-  function setColor(id: string, color: string) {
-    setDisciplinas((prev) => prev.map((d) => d.id === id ? { ...d, color } : { ...d, frentes: d.frentes.map((f) => f.id === id ? { ...f, color } : f) }));
-    startTransition(async () => { await setDisciplinaColorAction(id, color); });
+  // Cor da matéria (raiz): aplica variantes às frentes
+  function setMateriaColor(parentId: string, color: string) {
+    setDisciplinas((prev) => prev.map((d) => d.id === parentId ? { ...d, color } : d));
+    startTransition(async () => {
+      const r = await setMateriaColorAction(parentId, color);
+      if ("colors" in r && r.colors) {
+        const colors = r.colors;
+        setDisciplinas((prev) => prev.map((d) =>
+          d.id === parentId
+            ? { ...d, color: colors[d.id] ?? color, frentes: d.frentes.map((f) => ({ ...f, color: colors[f.id] ?? f.color })) }
+            : d,
+        ));
+      }
+    });
+  }
+
+  // Override manual da cor de uma frente
+  function setFrenteColor(frenteId: string, color: string) {
+    setDisciplinas((prev) => prev.map((d) => ({ ...d, frentes: d.frentes.map((f) => f.id === frenteId ? { ...f, color } : f) })));
+    startTransition(async () => { await setDisciplinaColorAction(frenteId, color); });
   }
 
   function addRoot() {
@@ -138,9 +155,9 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
                   <input
                     type="color"
                     value={d.color ?? "#0d9488"}
-                    onChange={(e) => setColor(d.id, e.target.value)}
+                    onChange={(e) => setMateriaColor(d.id, e.target.value)}
                     className="h-6 w-7 rounded border border-navy-200 cursor-pointer"
-                    title="Cor na grade de horários"
+                    title={d.frentes.length > 0 ? "Cor da matéria (gera tons nas frentes)" : "Cor na grade de horários"}
                     aria-label={`Cor de ${d.name}`}
                   />
                   <button
@@ -172,9 +189,9 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
                         <input
                           type="color"
                           value={f.color ?? "#0d9488"}
-                          onChange={(e) => setColor(f.id, e.target.value)}
+                          onChange={(e) => setFrenteColor(f.id, e.target.value)}
                           className="h-5 w-6 rounded border border-navy-200 cursor-pointer"
-                          title="Cor na grade de horários"
+                          title="Tom da frente (override manual)"
                           aria-label={`Cor de ${f.name}`}
                         />
                         <button
