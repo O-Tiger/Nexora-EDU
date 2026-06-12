@@ -36,7 +36,8 @@ export default async function DisciplinasPage() {
           id: d.id,
           name: d.name,
           position: d.position,
-          frentes: d.frentes.map((f) => ({ id: f.id, name: f.name, position: f.position })),
+          color: d.color,
+          frentes: d.frentes.map((f) => ({ id: f.id, name: f.name, position: f.position, color: f.color })),
         }))}
       />
     </div>

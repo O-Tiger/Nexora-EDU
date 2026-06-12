@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BookOpen, Users, GraduationCap, LayoutDashboard, LogOut, Menu, Upload, X,
-  Layout, MessageSquare, School, Award, FileText, Building2, ChevronsUpDown, Check, BookMarked,
+  Layout, MessageSquare, School, Award, FileText, Building2, ChevronsUpDown, Check, BookMarked, UserCog,
 } from "lucide-react";
 import { cn, Badge, Button, BRAND } from "@nexora/ui";
 import { signOut } from "next-auth/react";
@@ -48,6 +48,7 @@ const WORKSPACES: Record<Workspace, { label: string; icon: typeof LayoutDashboar
       { href: "/admin/secretaria", label: "Visão geral", icon: Building2, exact: true },
       { href: "/admin/secretaria/unidades", label: "Unidades & Turmas", icon: School },
       { href: "/admin/secretaria/alunos", label: "Alunos da escola", icon: GraduationCap },
+      { href: "/admin/secretaria/professores", label: "Professores", icon: UserCog },
       { href: "/admin/secretaria/disciplinas", label: "Disciplinas", icon: BookMarked },
       { href: "/admin/secretaria/boletins", label: "Boletins", icon: FileText },
     ],

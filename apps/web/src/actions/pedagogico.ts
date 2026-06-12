@@ -7,6 +7,7 @@ import { z } from "zod";
 import {
   createDisciplina, deleteDisciplina, setTurmaDisciplinas,
   upsertGrade, upsertAttendance,
+  updateDisciplinaColor, setTurmaDisciplinaProfessor,
 } from "@nexora/db/src/queries/pedagogico";
 import type { GradeKind } from "@nexora/db";
 
@@ -47,6 +48,25 @@ export async function deleteDisciplinaAction(id: string) {
   const { tenantId } = await requireStaff();
   await deleteDisciplina(id, tenantId);
   revalidatePath("/admin/secretaria/disciplinas");
+  return { success: true };
+}
+
+export async function setDisciplinaColorAction(id: string, color: string | null) {
+  const { tenantId } = await requireStaff();
+  if (color !== null && !/^#[0-9a-fA-F]{6}$/.test(color)) return { error: "Cor inválida" };
+  await updateDisciplinaColor(id, tenantId, color);
+  revalidatePath("/admin/secretaria/disciplinas");
+  return { success: true };
+}
+
+export async function setTurmaDisciplinaProfessorAction(
+  turmaId: string,
+  disciplinaId: string,
+  professorId: string | null,
+) {
+  const { tenantId } = await requireStaff();
+  await setTurmaDisciplinaProfessor(tenantId, turmaId, disciplinaId, professorId);
+  revalidatePath(`/admin/secretaria/turmas/${turmaId}/horario`);
   return { success: true };
 }
 

@@ -21,15 +21,26 @@ const SlotSchema = z.object({
   disciplinaId: z.string().cuid(),
 });
 
-export async function setHorarioAction(turmaId: string, slots: unknown) {
+const TimeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
+const ConfigSchema = z.object({
+  slots: z.array(z.object({
+    ordem: z.number().int().min(1).max(12),
+    inicio: z.string().regex(TimeRe).or(z.literal("")),
+    fim: z.string().regex(TimeRe).or(z.literal("")),
+  })).max(12),
+  sabado: z.boolean(),
+});
+
+export async function setHorarioAction(turmaId: string, input: unknown) {
   const { tenantId } = await requireStaff();
-  const parsed = z.array(SlotSchema).max(84).safeParse(slots);
+  const schema = z.object({ slots: z.array(SlotSchema).max(84), config: ConfigSchema });
+  const parsed = schema.safeParse(input);
   if (!parsed.success) return { error: "Grade inválida" };
 
   const turma = await prisma.turma.findFirst({ where: { id: turmaId, tenantId }, select: { id: true } });
   if (!turma) return { error: "Turma não encontrada" };
 
-  await setHorario(tenantId, turmaId, parsed.data);
+  await setHorario(tenantId, turmaId, parsed.data.slots, parsed.data.config);
   revalidatePath(`/admin/secretaria/turmas/${turmaId}/horario`);
   return { success: true };
 }

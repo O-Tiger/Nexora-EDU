@@ -1,28 +1,73 @@
 import { prisma } from "../client";
-import type { TipoEvento } from "@prisma/client";
+import type { TipoEvento, Prisma } from "@prisma/client";
+
+export type HorarioSlotConfig = { ordem: number; inicio: string; fim: string };
+export type HorarioConfig = { slots: HorarioSlotConfig[]; sabado: boolean };
 
 // ─── Grade de horários ─────────────────────────────────────────────────────────
 
 export async function getHorario(tenantId: string, turmaId: string) {
   return prisma.horarioAula.findMany({
     where: { tenantId, turmaId },
-    include: { disciplina: { select: { id: true, name: true } } },
+    include: { disciplina: { select: { id: true, name: true, color: true } } },
     orderBy: [{ diaSemana: "asc" }, { ordem: "asc" }],
   });
 }
 
-/** Substitui toda a grade da turma (slots vazios = ausência de linha). */
+/** Substitui a grade da turma e salva a config de horários (slots/sábado). */
 export async function setHorario(
   tenantId: string,
   turmaId: string,
   slots: { diaSemana: number; ordem: number; disciplinaId: string }[],
+  config: HorarioConfig,
 ) {
   await prisma.$transaction([
     prisma.horarioAula.deleteMany({ where: { tenantId, turmaId } }),
     prisma.horarioAula.createMany({
       data: slots.map((s) => ({ tenantId, turmaId, diaSemana: s.diaSemana, ordem: s.ordem, disciplinaId: s.disciplinaId })),
     }),
+    prisma.turma.update({ where: { id: turmaId }, data: { horarioConfig: config as unknown as Prisma.InputJsonValue } }),
   ]);
+}
+
+/** Dados completos para renderizar a grade (cores + professor + horários). */
+export async function getHorarioRenderData(tenantId: string, turmaId: string) {
+  const turma = await prisma.turma.findFirst({
+    where: { id: turmaId, tenantId },
+    include: {
+      unidade: { select: { name: true } },
+      anoLetivo: { select: { year: true } },
+      horarios: { include: { disciplina: { select: { id: true, name: true, color: true } } } },
+      disciplinas: {
+        include: {
+          disciplina: { select: { id: true, name: true, color: true } },
+          professor: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!turma) return null;
+
+  const professorByDisc = new Map<string, string>();
+  for (const td of turma.disciplinas) {
+    if (td.professor?.name) professorByDisc.set(td.disciplinaId, td.professor.name);
+  }
+
+  return {
+    turma: {
+      code: turma.code,
+      unidadeName: turma.unidade.name,
+      year: turma.anoLetivo.year,
+      config: (turma.horarioConfig as unknown as HorarioConfig | null) ?? { slots: [], sabado: false },
+    },
+    slots: turma.horarios.map((h) => ({
+      diaSemana: h.diaSemana,
+      ordem: h.ordem,
+      disciplinaName: h.disciplina.name,
+      color: h.disciplina.color,
+      professor: professorByDisc.get(h.disciplinaId) ?? null,
+    })),
+  };
 }
 
 // ─── Eventos do calendário ─────────────────────────────────────────────────────

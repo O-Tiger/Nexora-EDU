@@ -33,6 +33,10 @@ export async function deleteDisciplina(id: string, tenantId: string) {
   return prisma.disciplina.deleteMany({ where: { id, tenantId } });
 }
 
+export async function updateDisciplinaColor(id: string, tenantId: string, color: string | null) {
+  return prisma.disciplina.updateMany({ where: { id, tenantId }, data: { color } });
+}
+
 // ─── Vínculo turma ↔ disciplina ──────────────────────────────────────────────
 
 export async function getTurmaDisciplinas(tenantId: string, turmaId: string) {
@@ -43,14 +47,49 @@ export async function getTurmaDisciplinas(tenantId: string, turmaId: string) {
   return links.map((l) => l.disciplina);
 }
 
+/** Disciplinas da turma com professor vinculado (para grade e atribuição). */
+export async function getTurmaDisciplinasComProfessor(tenantId: string, turmaId: string) {
+  return prisma.turmaDisciplina.findMany({
+    where: { tenantId, turmaId },
+    include: {
+      disciplina: { select: { id: true, name: true, color: true } },
+      professor: { select: { id: true, name: true } },
+    },
+    orderBy: { disciplina: { name: "asc" } },
+  });
+}
+
+/** Atualiza disciplinas da turma sem destruir vínculos de professor existentes. */
 export async function setTurmaDisciplinas(tenantId: string, turmaId: string, disciplinaIds: string[]) {
+  const existing = await prisma.turmaDisciplina.findMany({
+    where: { tenantId, turmaId },
+    select: { disciplinaId: true },
+  });
+  const existingIds = new Set(existing.map((e) => e.disciplinaId));
+  const selected = new Set(disciplinaIds);
+
+  const toAdd = disciplinaIds.filter((id) => !existingIds.has(id));
+  const toRemove = [...existingIds].filter((id) => !selected.has(id));
+
   await prisma.$transaction([
-    prisma.turmaDisciplina.deleteMany({ where: { tenantId, turmaId } }),
+    prisma.turmaDisciplina.deleteMany({ where: { tenantId, turmaId, disciplinaId: { in: toRemove } } }),
     prisma.turmaDisciplina.createMany({
-      data: disciplinaIds.map((disciplinaId) => ({ tenantId, turmaId, disciplinaId })),
+      data: toAdd.map((disciplinaId) => ({ tenantId, turmaId, disciplinaId })),
       skipDuplicates: true,
     }),
   ]);
+}
+
+export async function setTurmaDisciplinaProfessor(
+  tenantId: string,
+  turmaId: string,
+  disciplinaId: string,
+  professorId: string | null,
+) {
+  return prisma.turmaDisciplina.updateMany({
+    where: { tenantId, turmaId, disciplinaId },
+    data: { professorId },
+  });
 }
 
 // ─── Notas e frequência ──────────────────────────────────────────────────────

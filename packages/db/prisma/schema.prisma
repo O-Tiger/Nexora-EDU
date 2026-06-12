@@ -40,6 +40,7 @@ model User {
   sentMessages     DirectMessage[]  @relation("DMSender")
   receivedMessages DirectMessage[]  @relation("DMReceiver")
   turmaEnrollments TurmaEnrollment[] @relation("StudentTurmaEnrollments")
+  professorDisciplinas TurmaDisciplina[] @relation("ProfessorDisciplinas")
 
   @@index([email])
 }
@@ -689,6 +690,8 @@ model Turma {
   letra       String
   periodo     Periodo  @default(MANHA)
   maxStudents Int      @default(35)
+  /// Configuração do horário: { slots: [{ ordem, inicio, fim }], sabado: bool }
+  horarioConfig Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -798,6 +801,8 @@ model Disciplina {
   parentId  String?
   /// Ordem de exibição no boletim
   position  Int      @default(0)
+  /// Cor (hex) usada na grade de horários e identidade visual
+  color     String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
@@ -814,14 +819,17 @@ model Disciplina {
 }
 
 /// Vínculo disciplina ↔ turma (quais disciplinas a turma cursa).
+/// professorId opcional: professor responsável por essa disciplina nesta turma.
 model TurmaDisciplina {
   id           String @id @default(cuid())
   tenantId     String
   turmaId      String
   disciplinaId String
+  professorId  String?
 
   turma      Turma      @relation(fields: [turmaId], references: [id], onDelete: Cascade)
   disciplina Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  professor  User?      @relation("ProfessorDisciplinas", fields: [professorId], references: [id])
 
   @@unique([turmaId, disciplinaId])
   @@index([tenantId, turmaId])

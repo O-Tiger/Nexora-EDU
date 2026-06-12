@@ -5,9 +5,11 @@ import Link from "next/link";
 import { ArrowLeft, CalendarClock } from "lucide-react";
 import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
-import { getTurmaDisciplinas } from "@nexora/db/src/queries/pedagogico";
-import { getHorario, getEventos } from "@nexora/db/src/queries/horario";
+import { getTurmaDisciplinasComProfessor } from "@nexora/db/src/queries/pedagogico";
+import { getHorario, getEventos, type HorarioConfig } from "@nexora/db/src/queries/horario";
+import { getProfessoresDisponiveis } from "@nexora/db/src/queries/professores";
 import { HorarioGrid } from "@/components/secretaria/horario-grid";
+import { ProfessorAssign } from "@/components/secretaria/professor-assign";
 import { EventosManager } from "@/components/secretaria/eventos-manager";
 
 export const metadata: Metadata = { title: "Horário & Eventos" };
@@ -18,14 +20,20 @@ export default async function HorarioPage({ params }: { params: Promise<{ id: st
   if (!session) redirect("/login");
   const tenantId = session.user.activeTenantId;
 
-  const turma = await prisma.turma.findFirst({ where: { id: turmaId, tenantId }, select: { id: true, code: true } });
+  const turma = await prisma.turma.findFirst({
+    where: { id: turmaId, tenantId },
+    select: { id: true, code: true, horarioConfig: true },
+  });
   if (!turma) notFound();
 
-  const [disciplinas, horario, eventos] = await Promise.all([
-    getTurmaDisciplinas(tenantId, turmaId),
+  const [turmaDisc, horario, eventos, professores] = await Promise.all([
+    getTurmaDisciplinasComProfessor(tenantId, turmaId),
     getHorario(tenantId, turmaId),
     getEventos(tenantId, turmaId),
+    getProfessoresDisponiveis(tenantId),
   ]);
+
+  const config = (turma.horarioConfig as unknown as HorarioConfig | null) ?? { slots: [], sabado: false };
 
   return (
     <div className="space-y-6">
@@ -41,10 +49,21 @@ export default async function HorarioPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
+      <ProfessorAssign
+        turmaId={turmaId}
+        professores={professores}
+        disciplinas={turmaDisc.map((td) => ({
+          disciplinaId: td.disciplina.id,
+          disciplinaName: td.disciplina.name,
+          professorId: td.professor?.id ?? null,
+        }))}
+      />
+
       <HorarioGrid
         turmaId={turmaId}
-        disciplinas={disciplinas.map((d) => ({ id: d.id, name: d.name }))}
+        disciplinas={turmaDisc.map((td) => ({ id: td.disciplina.id, name: td.disciplina.name, color: td.disciplina.color }))}
         initial={horario.map((h) => ({ diaSemana: h.diaSemana, ordem: h.ordem, disciplinaId: h.disciplinaId }))}
+        initialConfig={config}
       />
 
       <EventosManager

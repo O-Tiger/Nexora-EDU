@@ -9,6 +9,14 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 3 — Grade de horários, professores e cores)
+- `packages/db`: `Disciplina.color`, `TurmaDisciplina.professorId` (FK User), `Turma.horarioConfig` (Json) + migration
+- **Grade visual** estilo grade escolar: horários por linha (início/fim), cores por disciplina, professor por célula; preview inline (iframe) + **download PDF** (paisagem) em `/api/secretaria/horario`
+- **Cor por disciplina**: color picker no `DisciplinasManager` (raiz e frentes), refletida na grade
+- **Professor por disciplina da turma**: atribuição na página de horário (`ProfessorAssign`); `setTurmaDisciplinas` preserva vínculos de professor ao alterar disciplinas
+- **Aba Professores** (`/admin/secretaria/professores`): lista professores do tenant e seus vínculos (turma · disciplina)
+- **Ordenação de disciplinas**: por nome (A–Z / Z–A) e por nº de frentes (mais/menos) no `DisciplinasManager`
+
 ### Added (Fase 3 — Diário de classe)
 - `packages/db`: models `RegistroAula` (turma + disciplina + data + nº de aulas + conteúdo + observações) e `PresencaAluno` (faltas/justificadas por aluno) + migration
 - **Presença parcial em geminadas**: cada registro pode ter N aulas; o aluno pode faltar a algumas (0…N) — faltas e justificadas contadas por aula

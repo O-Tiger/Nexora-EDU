@@ -1,13 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { Button, Input, toast } from "@nexora/ui";
-import { Plus, Trash2, CornerDownRight, BookMarked } from "lucide-react";
-import { createDisciplinaAction, deleteDisciplinaAction } from "@/actions/pedagogico";
+import { Plus, Trash2, CornerDownRight, BookMarked, ArrowDownUp } from "lucide-react";
+import { createDisciplinaAction, deleteDisciplinaAction, setDisciplinaColorAction } from "@/actions/pedagogico";
 import { useConfirm } from "@/hooks/use-confirm";
 
-interface Frente { id: string; name: string; position: number }
-interface Disciplina { id: string; name: string; position: number; frentes: Frente[] }
+interface Frente { id: string; name: string; position: number; color: string | null }
+interface Disciplina { id: string; name: string; position: number; color: string | null; frentes: Frente[] }
+
+type SortMode = "alpha" | "alpha-desc" | "frentes-desc" | "frentes-asc";
+const SORT_LABELS: Record<SortMode, string> = {
+  alpha: "Nome (A–Z)",
+  "alpha-desc": "Nome (Z–A)",
+  "frentes-desc": "Mais frentes",
+  "frentes-asc": "Menos frentes",
+};
 
 export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
   const [disciplinas, setDisciplinas] = useState<Disciplina[]>(initial);
@@ -16,6 +24,22 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
   const [frenteName, setFrenteName] = useState("");
   const [isPending, startTransition] = useTransition();
   const [ConfirmDialog, confirm] = useConfirm();
+  const [sort, setSort] = useState<SortMode>("alpha");
+
+  const sorted = useMemo(() => {
+    const arr = [...disciplinas];
+    switch (sort) {
+      case "alpha": return arr.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+      case "alpha-desc": return arr.sort((a, b) => b.name.localeCompare(a.name, "pt-BR"));
+      case "frentes-desc": return arr.sort((a, b) => b.frentes.length - a.frentes.length || a.name.localeCompare(b.name, "pt-BR"));
+      case "frentes-asc": return arr.sort((a, b) => a.frentes.length - b.frentes.length || a.name.localeCompare(b.name, "pt-BR"));
+    }
+  }, [disciplinas, sort]);
+
+  function setColor(id: string, color: string) {
+    setDisciplinas((prev) => prev.map((d) => d.id === id ? { ...d, color } : { ...d, frentes: d.frentes.map((f) => f.id === id ? { ...f, color } : f) }));
+    startTransition(async () => { await setDisciplinaColorAction(id, color); });
+  }
 
   function addRoot() {
     if (!newName.trim()) return;
@@ -81,11 +105,26 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
         </Button>
       </div>
 
+      {disciplinas.length > 1 && (
+        <div className="flex items-center gap-2 text-xs">
+          <ArrowDownUp className="h-3.5 w-3.5 text-navy-400" />
+          <span className="text-navy-500">Ordenar:</span>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortMode)}
+            className="rounded-md border border-navy-200 px-2 py-1 text-xs"
+            aria-label="Ordenar disciplinas"
+          >
+            {(Object.keys(SORT_LABELS) as SortMode[]).map((s) => <option key={s} value={s}>{SORT_LABELS[s]}</option>)}
+          </select>
+        </div>
+      )}
+
       {disciplinas.length === 0 ? (
         <p className="text-sm text-navy-400">Nenhuma disciplina cadastrada.</p>
       ) : (
         <div className="space-y-2">
-          {disciplinas.map((d) => (
+          {sorted.map((d) => (
             <div key={d.id} className="rounded-lg border border-navy-100 bg-white">
               <div className="flex items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -96,6 +135,14 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={d.color ?? "#0d9488"}
+                    onChange={(e) => setColor(d.id, e.target.value)}
+                    className="h-6 w-7 rounded border border-navy-200 cursor-pointer"
+                    title="Cor na grade de horários"
+                    aria-label={`Cor de ${d.name}`}
+                  />
                   <button
                     onClick={() => { setFrenteFor(frenteFor === d.id ? null : d.id); setFrenteName(""); }}
                     className="text-xs text-teal-600 hover:underline"
@@ -121,14 +168,24 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
                         <CornerDownRight className="h-3.5 w-3.5 text-navy-300" aria-hidden="true" />
                         {f.name}
                       </span>
-                      <button
-                        onClick={() => remove(f.id, f.name, false)}
-                        disabled={isPending}
-                        className="p-1 text-navy-300 hover:text-red-500"
-                        aria-label={`Excluir ${f.name}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={f.color ?? "#0d9488"}
+                          onChange={(e) => setColor(f.id, e.target.value)}
+                          className="h-5 w-6 rounded border border-navy-200 cursor-pointer"
+                          title="Cor na grade de horários"
+                          aria-label={`Cor de ${f.name}`}
+                        />
+                        <button
+                          onClick={() => remove(f.id, f.name, false)}
+                          disabled={isPending}
+                          className="p-1 text-navy-300 hover:text-red-500"
+                          aria-label={`Excluir ${f.name}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
