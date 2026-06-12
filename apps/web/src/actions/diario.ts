@@ -17,10 +17,11 @@ async function requireStaff() {
 
 const PresencaSchema = z.object({
   enrollmentId: z.string().cuid(),
-  status: z.enum(["PRESENTE", "AUSENTE", "JUSTIFICADA"]),
+  faltas: z.number().int().min(0).max(10),
+  justificadas: z.number().int().min(0).max(10),
 });
 
-const RegistroSchema = z.object({
+const RegistroBase = z.object({
   turmaId: z.string().cuid(),
   disciplinaId: z.string().cuid(),
   data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
@@ -29,6 +30,12 @@ const RegistroSchema = z.object({
   observacoes: z.string().max(1000).optional(),
   presencas: z.array(PresencaSchema).max(100),
 });
+
+const refineFaltas = (d: z.infer<typeof RegistroBase>) =>
+  d.presencas.every((p) => p.faltas + p.justificadas <= d.quantidadeAulas);
+const refineMsg = { message: "Faltas + justificadas não podem exceder o nº de aulas", path: ["presencas"] };
+
+const RegistroSchema = RegistroBase.refine(refineFaltas, refineMsg);
 
 export async function saveRegistroAction(input: unknown) {
   const { tenantId, userId } = await requireStaff();
@@ -59,7 +66,7 @@ export async function saveRegistroAction(input: unknown) {
   return { success: true };
 }
 
-const UpdateSchema = RegistroSchema.extend({ id: z.string().cuid() });
+const UpdateSchema = RegistroBase.extend({ id: z.string().cuid() }).refine(refineFaltas, refineMsg);
 
 export async function updateRegistroAction(input: unknown) {
   const { tenantId } = await requireStaff();

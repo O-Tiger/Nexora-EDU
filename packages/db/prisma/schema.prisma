@@ -895,21 +895,20 @@ model RegistroAula {
 }
 
 /// Presença de um aluno num registro de aula.
+/// Suporta presença parcial em aulas geminadas: o aluno pode faltar a algumas
+/// das N aulas do registro. Só são persistidos alunos com falta (presença = ausência de linha).
 model PresencaAluno {
-  id           String         @id @default(cuid())
+  id           String @id @default(cuid())
   registroId   String
   enrollmentId String
-  status       PresencaStatus @default(PRESENTE)
+  /// Faltas não justificadas neste registro (0..quantidadeAulas) — contam no boletim
+  faltas       Int    @default(0)
+  /// Faltas justificadas (não contam no boletim)
+  justificadas Int    @default(0)
 
   registro   RegistroAula    @relation(fields: [registroId], references: [id], onDelete: Cascade)
   enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
 
   @@unique([registroId, enrollmentId])
   @@index([enrollmentId])
-}
-
-enum PresencaStatus {
-  PRESENTE
-  AUSENTE
-  JUSTIFICADA
 }

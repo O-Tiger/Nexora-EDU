@@ -1,5 +1,7 @@
 import { prisma } from "../client";
-import type { PresencaStatus } from "@prisma/client";
+
+/** Presença com faltas parciais. Só persistimos alunos com alguma falta. */
+export type PresencaInput = { enrollmentId: string; faltas: number; justificadas: number };
 
 // ─── Registros de aula ─────────────────────────────────────────────────────────
 
@@ -33,13 +35,17 @@ export async function createRegistro(data: {
   conteudo: string;
   observacoes?: string;
   createdBy: string;
-  presencas: { enrollmentId: string; status: PresencaStatus }[];
+  presencas: PresencaInput[];
 }) {
   const { presencas, ...registro } = data;
+  // Só persiste alunos com alguma falta (presença total = ausência de linha)
+  const comFalta = presencas.filter((p) => p.faltas > 0 || p.justificadas > 0);
   return prisma.registroAula.create({
     data: {
       ...registro,
-      presencas: { create: presencas.map((p) => ({ enrollmentId: p.enrollmentId, status: p.status })) },
+      presencas: {
+        create: comFalta.map((p) => ({ enrollmentId: p.enrollmentId, faltas: p.faltas, justificadas: p.justificadas })),
+      },
     },
   });
 }
@@ -52,12 +58,14 @@ export async function updateRegistro(
     quantidadeAulas: number;
     conteudo: string;
     observacoes?: string;
-    presencas: { enrollmentId: string; status: PresencaStatus }[];
+    presencas: PresencaInput[];
   },
 ) {
   // Verifica ownership antes de mutar
   const exists = await prisma.registroAula.findFirst({ where: { id, tenantId }, select: { id: true } });
   if (!exists) throw new Error("Registro não encontrado");
+
+  const comFalta = data.presencas.filter((p) => p.faltas > 0 || p.justificadas > 0);
 
   return prisma.$transaction([
     prisma.registroAula.update({
@@ -71,7 +79,7 @@ export async function updateRegistro(
     }),
     prisma.presencaAluno.deleteMany({ where: { registroId: id } }),
     prisma.presencaAluno.createMany({
-      data: data.presencas.map((p) => ({ registroId: id, enrollmentId: p.enrollmentId, status: p.status })),
+      data: comFalta.map((p) => ({ registroId: id, enrollmentId: p.enrollmentId, faltas: p.faltas, justificadas: p.justificadas })),
     }),
   ]);
 }
@@ -81,9 +89,8 @@ export async function deleteRegistro(id: string, tenantId: string) {
 }
 
 /**
- * Conta faltas por aluno e disciplina a partir do diário de classe.
- * Falta = soma de quantidadeAulas dos registros em que o aluno está AUSENTE
- * (JUSTIFICADA não conta). Retorna Map<`${enrollmentId}|${disciplinaId}`, faltas>.
+ * Soma faltas (não justificadas) por aluno e disciplina a partir do diário.
+ * Justificadas não contam. Retorna Map<`${enrollmentId}|${disciplinaId}`, faltas>.
  * Vazio quando não há diário lançado (boletim cai no fallback manual).
  */
 export async function getFaltasFromDiario(
@@ -94,8 +101,7 @@ export async function getFaltasFromDiario(
     where: { tenantId, turmaId },
     select: {
       disciplinaId: true,
-      quantidadeAulas: true,
-      presencas: { where: { status: "AUSENTE" }, select: { enrollmentId: true } },
+      presencas: { where: { faltas: { gt: 0 } }, select: { enrollmentId: true, faltas: true } },
     },
   });
 
@@ -103,7 +109,7 @@ export async function getFaltasFromDiario(
   for (const r of registros) {
     for (const p of r.presencas) {
       const key = `${p.enrollmentId}|${r.disciplinaId}`;
-      faltas.set(key, (faltas.get(key) ?? 0) + r.quantidadeAulas);
+      faltas.set(key, (faltas.get(key) ?? 0) + p.faltas);
     }
   }
   return faltas;

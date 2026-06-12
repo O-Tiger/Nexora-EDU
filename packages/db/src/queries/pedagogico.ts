@@ -177,11 +177,14 @@ export async function getBoletimData(
   }
 
   const enrollmentIds = turma.enrollments.map((e) => e.id);
-  const [grades, attendances, faltasDiario] = await Promise.all([
+  const [grades, attendances, faltasDiario, diarioCount] = await Promise.all([
     prisma.grade.findMany({ where: { tenantId, enrollmentId: { in: enrollmentIds } } }),
     prisma.attendance.findMany({ where: { tenantId, enrollmentId: { in: enrollmentIds } } }),
     getFaltasFromDiario(tenantId, turmaId),
+    prisma.registroAula.count({ where: { tenantId, turmaId } }),
   ]);
+  // Se a turma tem diário lançado, as faltas vêm dele (default 0); senão, do manual
+  const diarioAtivo = diarioCount > 0;
 
   const students: BoletimStudent[] = turma.enrollments.map((enr, idx) => {
     const rows: BoletimDisciplinaRow[] = orderedDisciplinas.map((d) => {
@@ -191,10 +194,11 @@ export async function getBoletimData(
           cellGrades[`p${g.period}-${g.kind}`] = g.score ?? null;
         }
       }
-      // Faltas: prioriza o diário de classe; fallback à falta manual (Attendance)
-      const diarioFaltas = faltasDiario.get(`${enr.id}|${d.id}`);
+      // Faltas: diário ativo → conta do diário (default 0); senão, falta manual
       const att = attendances.find((a) => a.enrollmentId === enr.id && a.disciplinaId === d.id);
-      const absences = diarioFaltas ?? att?.absences ?? 0;
+      const absences = diarioAtivo
+        ? (faltasDiario.get(`${enr.id}|${d.id}`) ?? 0)
+        : (att?.absences ?? 0);
       return {
         disciplinaId: d.id,
         name: d.name,

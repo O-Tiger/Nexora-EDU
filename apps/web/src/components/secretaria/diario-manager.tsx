@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Button, Input, Textarea, Label, toast } from "@nexora/ui";
-import { Plus, BookText, Check, X, Clock } from "lucide-react";
+import { Plus, Minus, BookText, X } from "lucide-react";
 import { saveRegistroAction, deleteRegistroAction } from "@/actions/diario";
 import { useConfirm } from "@/hooks/use-confirm";
 
@@ -18,7 +18,7 @@ interface Registro {
   presencasCount: number;
 }
 
-type Status = "PRESENTE" | "AUSENTE" | "JUSTIFICADA";
+interface Presenca { faltas: number; justificadas: number }
 
 interface Props {
   turmaId: string;
@@ -27,15 +27,16 @@ interface Props {
   registros: Registro[];
 }
 
-const STATUS_CYCLE: Status[] = ["PRESENTE", "AUSENTE", "JUSTIFICADA"];
-const STATUS_META: Record<Status, { label: string; short: string; cls: string; Icon: typeof Check }> = {
-  PRESENTE: { label: "Presente", short: "P", cls: "bg-teal-50 text-teal-700 border-teal-200", Icon: Check },
-  AUSENTE: { label: "Ausente", short: "F", cls: "bg-red-50 text-red-700 border-red-200", Icon: X },
-  JUSTIFICADA: { label: "Justificada", short: "J", cls: "bg-amber-50 text-amber-700 border-amber-200", Icon: Clock },
-};
-
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function statusLabel(p: Presenca, n: number): { text: string; cls: string } {
+  const total = p.faltas + p.justificadas;
+  if (total === 0) return { text: "Presente", cls: "text-teal-600" };
+  if (p.faltas >= n) return { text: "Ausente", cls: "text-red-600" };
+  if (p.faltas === 0) return { text: "Justificada", cls: "text-amber-600" };
+  return { text: "Parcial", cls: "text-amber-600" };
 }
 
 export function DiarioManager({ turmaId, students, disciplinas, registros }: Props) {
@@ -45,27 +46,29 @@ export function DiarioManager({ turmaId, students, disciplinas, registros }: Pro
   const [quantidadeAulas, setQuantidadeAulas] = useState(1);
   const [conteudo, setConteudo] = useState("");
   const [observacoes, setObservacoes] = useState("");
-  const [presencas, setPresencas] = useState<Map<string, Status>>(
-    () => new Map(students.map((s) => [s.enrollmentId, "PRESENTE" as Status])),
+  const [presencas, setPresencas] = useState<Map<string, Presenca>>(
+    () => new Map(students.map((s) => [s.enrollmentId, { faltas: 0, justificadas: 0 }])),
   );
   const [isPending, startTransition] = useTransition();
   const [ConfirmDialog, confirm] = useConfirm();
 
-  function cycle(enrollmentId: string) {
+  function setField(enrollmentId: string, field: keyof Presenca, delta: number) {
     setPresencas((prev) => {
-      const cur = prev.get(enrollmentId) ?? "PRESENTE";
-      const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length]!;
+      const cur = prev.get(enrollmentId) ?? { faltas: 0, justificadas: 0 };
+      const next = { ...cur, [field]: Math.max(0, cur[field] + delta) };
+      // Garante faltas + justificadas <= quantidadeAulas
+      if (next.faltas + next.justificadas > quantidadeAulas) return prev;
       return new Map(prev).set(enrollmentId, next);
     });
   }
 
-  function setAll(status: Status) {
-    setPresencas(new Map(students.map((s) => [s.enrollmentId, status])));
+  function resetPresencas() {
+    setPresencas(new Map(students.map((s) => [s.enrollmentId, { faltas: 0, justificadas: 0 }])));
   }
 
   function reset() {
     setConteudo(""); setObservacoes(""); setQuantidadeAulas(1); setData(todayISO());
-    setPresencas(new Map(students.map((s) => [s.enrollmentId, "PRESENTE"])));
+    resetPresencas();
   }
 
   function save() {
@@ -79,7 +82,10 @@ export function DiarioManager({ turmaId, students, disciplinas, registros }: Pro
         quantidadeAulas,
         conteudo,
         observacoes: observacoes || undefined,
-        presencas: students.map((s) => ({ enrollmentId: s.enrollmentId, status: presencas.get(s.enrollmentId) ?? "PRESENTE" })),
+        presencas: students.map((s) => {
+          const p = presencas.get(s.enrollmentId) ?? { faltas: 0, justificadas: 0 };
+          return { enrollmentId: s.enrollmentId, faltas: p.faltas, justificadas: p.justificadas };
+        }),
       });
       if ("error" in r) { toast({ variant: "destructive", title: "Erro", description: r.error }); return; }
       toast({ title: "Aula registrada" });
@@ -102,7 +108,7 @@ export function DiarioManager({ turmaId, students, disciplinas, registros }: Pro
     });
   }
 
-  const ausentes = [...presencas.values()].filter((s) => s === "AUSENTE").length;
+  const totalFaltas = [...presencas.values()].reduce((a, p) => a + p.faltas, 0);
 
   return (
     <div className="space-y-5">
@@ -141,7 +147,20 @@ export function DiarioManager({ turmaId, students, disciplinas, registros }: Pro
             <div className="space-y-1">
               <Label htmlFor="d-qtd" className="text-xs">Nº de aulas</Label>
               <Input id="d-qtd" type="number" min={1} max={10} value={quantidadeAulas}
-                onChange={(e) => setQuantidadeAulas(Math.max(1, Math.min(10, Number(e.target.value) || 1)))} />
+                onChange={(e) => {
+                  const n = Math.max(1, Math.min(10, Number(e.target.value) || 1));
+                  setQuantidadeAulas(n);
+                  // Reclampa presenças que excedam o novo total
+                  setPresencas((prev) => {
+                    const next = new Map(prev);
+                    for (const [k, p] of next) {
+                      if (p.faltas + p.justificadas > n) {
+                        next.set(k, { faltas: Math.min(p.faltas, n), justificadas: 0 });
+                      }
+                    }
+                    return next;
+                  });
+                }} />
             </div>
           </div>
 
@@ -154,31 +173,46 @@ export function DiarioManager({ turmaId, students, disciplinas, registros }: Pro
             <Input id="d-obs" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} maxLength={1000} />
           </div>
 
-          {/* Chamada / presença */}
+          {/* Chamada */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Chamada {ausentes > 0 && <span className="text-red-500">· {ausentes} ausente(s)</span>}</Label>
-              <div className="flex gap-2 text-xs">
-                <button type="button" onClick={() => setAll("PRESENTE")} className="text-teal-600 hover:underline">Todos presentes</button>
-                <span className="text-navy-200">|</span>
-                <span className="text-navy-400">Clique no status para alternar</span>
+              <Label className="text-xs">
+                Chamada {totalFaltas > 0 && <span className="text-red-500">· {totalFaltas} falta(s)</span>}
+              </Label>
+              <div className="flex items-center gap-2 text-xs">
+                <button type="button" onClick={resetPresencas} className="text-teal-600 hover:underline">Todos presentes</button>
+                {quantidadeAulas > 1 && <span className="text-navy-400">Faltas parciais (0–{quantidadeAulas})</span>}
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-72 overflow-y-auto">
+            <div className="max-h-80 overflow-y-auto divide-y divide-navy-50 rounded-md border border-navy-100">
+              <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 bg-navy-50 px-3 py-1.5 text-[10px] font-semibold uppercase text-navy-400">
+                <span>Aluno</span>
+                <span className="text-center w-28">Faltas</span>
+                <span className="text-center w-28">Justificadas</span>
+              </div>
               {students.map((s) => {
-                const st = presencas.get(s.enrollmentId) ?? "PRESENTE";
-                const m = STATUS_META[st];
+                const p = presencas.get(s.enrollmentId) ?? { faltas: 0, justificadas: 0 };
+                const st = statusLabel(p, quantidadeAulas);
                 return (
-                  <div key={s.enrollmentId} className="flex items-center justify-between rounded-md border border-navy-100 px-3 py-1.5">
-                    <span className="text-sm text-navy-800 truncate">{s.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => cycle(s.enrollmentId)}
-                      className={`flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium ${m.cls}`}
-                      aria-label={`${s.name}: ${m.label} (clique para alternar)`}
-                    >
-                      <m.Icon className="h-3 w-3" /> {m.label}
-                    </button>
+                  <div key={s.enrollmentId} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 px-3 py-1.5">
+                    <div className="min-w-0">
+                      <span className="text-sm text-navy-800 truncate">{s.name}</span>
+                      <span className={`ml-2 text-[11px] ${st.cls}`}>{st.text}</span>
+                    </div>
+                    <Stepper
+                      value={p.faltas}
+                      onDec={() => setField(s.enrollmentId, "faltas", -1)}
+                      onInc={() => setField(s.enrollmentId, "faltas", +1)}
+                      max={quantidadeAulas - p.justificadas}
+                      ariaLabel={`Faltas de ${s.name}`}
+                    />
+                    <Stepper
+                      value={p.justificadas}
+                      onDec={() => setField(s.enrollmentId, "justificadas", -1)}
+                      onInc={() => setField(s.enrollmentId, "justificadas", +1)}
+                      max={quantidadeAulas - p.faltas}
+                      ariaLabel={`Justificadas de ${s.name}`}
+                    />
                   </div>
                 );
               })}
@@ -204,10 +238,11 @@ export function DiarioManager({ turmaId, students, disciplinas, registros }: Pro
             {registros.map((r) => (
               <div key={r.id} className="flex items-start justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-navy-900">{r.disciplinaName}</span>
                     <span className="text-xs text-navy-400">
                       {new Date(r.data + "T00:00:00").toLocaleDateString("pt-BR")} · {r.quantidadeAulas} aula{r.quantidadeAulas !== 1 ? "s" : ""}
+                      {r.presencasCount > 0 && ` · ${r.presencasCount} com falta`}
                     </span>
                   </div>
                   <p className="mt-0.5 text-sm text-navy-600 line-clamp-2">{r.conteudo}</p>
@@ -225,6 +260,34 @@ export function DiarioManager({ turmaId, students, disciplinas, registros }: Pro
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function Stepper({ value, onDec, onInc, max, ariaLabel }: {
+  value: number; onDec: () => void; onInc: () => void; max: number; ariaLabel: string;
+}) {
+  return (
+    <div className="flex items-center gap-1 w-28 justify-center" role="group" aria-label={ariaLabel}>
+      <button
+        type="button"
+        onClick={onDec}
+        disabled={value <= 0}
+        className="rounded border border-navy-200 p-0.5 text-navy-500 hover:bg-navy-50 disabled:opacity-30"
+        aria-label="Diminuir"
+      >
+        <Minus className="h-3.5 w-3.5" />
+      </button>
+      <span className={`w-5 text-center text-sm tabular-nums ${value > 0 ? "font-semibold text-navy-900" : "text-navy-400"}`}>{value}</span>
+      <button
+        type="button"
+        onClick={onInc}
+        disabled={value >= max}
+        className="rounded border border-navy-200 p-0.5 text-navy-500 hover:bg-navy-50 disabled:opacity-30"
+        aria-label="Aumentar"
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

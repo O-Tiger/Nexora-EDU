@@ -10,10 +10,11 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 ## [Unreleased]
 
 ### Added (Fase 3 — Diário de classe)
-- `packages/db`: models `RegistroAula` (turma + disciplina + data + nº de aulas + conteúdo + observações) e `PresencaAluno` (status PRESENTE/AUSENTE/JUSTIFICADA) + enum + migration
-- `packages/db/src/queries/diario.ts`: CRUD de registros, presenças e `getFaltasFromDiario()` (conta faltas por aluno/disciplina; justificada não conta)
-- `apps/web`: `/admin/secretaria/turmas/[id]/diario` — registro de aula com conteúdo ministrado + chamada (presença por aluno com toque para alternar P/F/J, "todos presentes"), lista de registros e exclusão
-- **Boletim**: faltas passam a ser contadas do diário quando há registros, com fallback à falta manual (`Attendance`)
+- `packages/db`: models `RegistroAula` (turma + disciplina + data + nº de aulas + conteúdo + observações) e `PresencaAluno` (faltas/justificadas por aluno) + migration
+- **Presença parcial em geminadas**: cada registro pode ter N aulas; o aluno pode faltar a algumas (0…N) — faltas e justificadas contadas por aula
+- `packages/db/src/queries/diario.ts`: CRUD de registros e `getFaltasFromDiario()` (soma faltas por aluno/disciplina; justificada não conta; só persiste alunos com falta)
+- `apps/web`: `/admin/secretaria/turmas/[id]/diario` — registro de aula com conteúdo ministrado + chamada com steppers de faltas/justificadas por aluno, "todos presentes", lista de registros e exclusão
+- **Boletim**: quando a turma tem diário lançado, as faltas vêm dele (default 0); senão, fallback à falta manual (`Attendance`)
 - `apps/web`: link "Diário" no detalhe da turma
 
 ### Added (Fase 3 — Pedagógico & Certificados)
