@@ -1,4 +1,4 @@
-import type { BoletimData, BoletimStudent } from "@nexora/db/src/queries/pedagogico";
+import type { BoletimData, BoletimStudent, BoletimDisciplinaRow } from "@nexora/db/src/queries/pedagogico";
 
 // Puppeteer carregado dinamicamente — fora do bundle client
 async function getPuppeteer() {
@@ -10,6 +10,44 @@ async function getPuppeteer() {
 const DIAS_LETIVOS = 200;
 
 export type BoletimFormat = "html" | "pdf" | "doc";
+/** "avulsas": frentes como linhas próprias · "media": consolida frentes na disciplina-mãe. */
+export type BoletimFrentes = "avulsas" | "media";
+
+const GRADE_KEYS = ["p1-AVA", "p2-AVA", "p3-AVA", "p0-RECP", "p0-FINAL"] as const;
+
+/** Consolida as frentes na disciplina-mãe, fazendo a média de cada célula. */
+function consolidateRows(rows: BoletimDisciplinaRow[]): BoletimDisciplinaRow[] {
+  const byId = new Set(rows.map((r) => r.disciplinaId));
+  const frentesByParent = new Map<string, BoletimDisciplinaRow[]>();
+  for (const r of rows) {
+    if (r.parentId) {
+      const arr = frentesByParent.get(r.parentId) ?? [];
+      arr.push(r);
+      frentesByParent.set(r.parentId, arr);
+    }
+  }
+
+  const result: BoletimDisciplinaRow[] = [];
+  for (const r of rows) {
+    if (r.isFrente) continue; // tratadas via mãe (ou como órfãs abaixo)
+    const frentes = frentesByParent.get(r.disciplinaId) ?? [];
+    if (frentes.length === 0) { result.push(r); continue; }
+
+    const sources = [r, ...frentes];
+    const grades: Record<string, number | null> = {};
+    for (const k of GRADE_KEYS) {
+      const vals = sources.map((s) => s.grades[k]).filter((v): v is number => typeof v === "number");
+      grades[k] = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : null;
+    }
+    const absences = sources.reduce((a, s) => a + s.absences, 0);
+    result.push({ ...r, grades, absences, isFrente: false });
+  }
+  // Frentes órfãs (mãe não vinculada) — mantém como linha própria
+  for (const r of rows) {
+    if (r.isFrente && !(r.parentId && byId.has(r.parentId))) result.push(r);
+  }
+  return result;
+}
 
 interface SchoolHeader {
   name: string;
@@ -83,11 +121,13 @@ function gradeCell(v: number | null, extraClass = ""): string {
   return `<td class="td-nota ${gradeClass(v)} ${extraClass}">${fmt(v)}</td>`;
 }
 
-function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader): string {
-  const freqPct = Math.max(0, Math.round((1 - student.totalAbsences / DIAS_LETIVOS) * 100));
-  const media = overallMedia(student.rows);
+function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes): string {
+  const rows = frentes === "media" ? consolidateRows(student.rows) : student.rows;
+  const totalAbsences = rows.reduce((sum, r) => sum + r.absences, 0);
+  const freqPct = Math.max(0, Math.round((1 - totalAbsences / DIAS_LETIVOS) * 100));
+  const media = overallMedia(rows);
 
-  const rowsHtml = student.rows.map((r) => {
+  const rowsHtml = rows.map((r) => {
     const s = computeRowSummary(r.grades);
     const discCls = r.isFrente ? "td-disc td-frente" : "td-disc";
     return `<tr>
@@ -157,9 +197,9 @@ function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolH
 
     <div class="bol-rodape">
       <div class="bol-rodape-resultado">
-        <strong>RESULTADO FINAL:</strong> ${studentResult(student.rows)}
+        <strong>RESULTADO FINAL:</strong> ${studentResult(rows)}
         &nbsp;&nbsp;&nbsp;
-        <strong>FALTAS ACUMULADAS:</strong> ${student.totalAbsences}
+        <strong>FALTAS ACUMULADAS:</strong> ${totalAbsences}
         &nbsp;&nbsp;&nbsp;
         <strong>% FREQ.:</strong> ${freqPct}
       </div>
@@ -220,8 +260,8 @@ const BOL_CSS = `
   .bol-rodape-media { font-size: 12px; font-weight: bold; }
 `;
 
-export function buildBoletimHtml(data: BoletimData, school: SchoolHeader): string {
-  const pages = data.students.map((s) => studentCard(s, data, school)).join('<div class="page-break"></div>');
+export function buildBoletimHtml(data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes = "avulsas"): string {
+  const pages = data.students.map((s) => studentCard(s, data, school, frentes)).join('<div class="page-break"></div>');
   return `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8"><style>${BOL_CSS}</style></head>
 <body>${pages}</body></html>`;

@@ -159,7 +159,7 @@ export function NotasGrid(props: Props) {
                     <th className="px-2 py-2 font-semibold w-16">Faltas</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-navy-50">
+                <tbody key={selectedDisc} className="divide-y divide-navy-50">
                   {students.map((s) => (
                     <tr key={s.enrollmentId}>
                       <td className="px-3 py-1.5 font-medium text-navy-800 whitespace-nowrap sticky left-0 bg-white">{s.name}</td>

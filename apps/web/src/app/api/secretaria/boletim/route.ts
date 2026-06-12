@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@nexora/auth";
 import { getBoletimData } from "@nexora/db/src/queries/pedagogico";
-import { buildBoletimHtml, renderBoletim, type BoletimFormat } from "@/lib/boletim";
+import { buildBoletimHtml, renderBoletim, type BoletimFormat, type BoletimFrentes } from "@/lib/boletim";
 import { createAuditLog } from "@nexora/db/src/queries/audit";
 import { BRAND } from "@nexora/ui";
 
@@ -27,6 +27,7 @@ export async function GET(req: Request) {
   const turmaId = url.searchParams.get("turmaId");
   const enrollmentId = url.searchParams.get("enrollmentId") ?? undefined;
   const format = (url.searchParams.get("format") ?? "pdf") as BoletimFormat;
+  const frentes = (url.searchParams.get("frentes") === "media" ? "media" : "avulsas") as BoletimFrentes;
 
   if (!turmaId) return NextResponse.json({ error: "turmaId obrigatório" }, { status: 400 });
   if (!FORMATS.includes(format)) return NextResponse.json({ error: "Formato inválido" }, { status: 400 });
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
     ...(process.env.SCHOOL_CNPJ && { cnpj: process.env.SCHOOL_CNPJ }),
     ...(process.env.SCHOOL_ADDRESS && { address: process.env.SCHOOL_ADDRESS }),
     ...(process.env.SCHOOL_LOGO_URL && { logoUrl: process.env.SCHOOL_LOGO_URL }),
-  });
+  }, frentes);
 
   let rendered;
   try {

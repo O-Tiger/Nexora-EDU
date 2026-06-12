@@ -99,6 +99,7 @@ export type BoletimDisciplinaRow = {
   disciplinaId: string;
   name: string;
   isFrente: boolean;
+  parentId: string | null;
   grades: Record<string, number | null>; // chave "p{period}-{kind}"
   absences: number;
 };
@@ -119,7 +120,7 @@ export type BoletimData = {
     unidadeName: string;
     year: number;
   };
-  disciplinaOrder: { id: string; name: string; isFrente: boolean }[];
+  disciplinaOrder: { id: string; name: string; isFrente: boolean; parentId: string | null }[];
   students: BoletimStudent[];
 };
 
@@ -163,16 +164,16 @@ export async function getBoletimData(
       frentesByParent.set(d.parentId, arr);
     }
   }
-  const orderedDisciplinas: { id: string; name: string; isFrente: boolean }[] = [];
+  const orderedDisciplinas: { id: string; name: string; isFrente: boolean; parentId: string | null }[] = [];
   for (const root of roots) {
-    orderedDisciplinas.push({ id: root.id, name: root.name, isFrente: false });
+    orderedDisciplinas.push({ id: root.id, name: root.name, isFrente: false, parentId: null });
     const fr = (frentesByParent.get(root.id) ?? []).sort((a, b) => a.position - b.position);
-    for (const f of fr) orderedDisciplinas.push({ id: f.id, name: f.name, isFrente: true });
+    for (const f of fr) orderedDisciplinas.push({ id: f.id, name: f.name, isFrente: true, parentId: root.id });
   }
   // Frentes órfãs (pai não vinculado à turma) — incluir mesmo assim
   for (const d of disciplinas) {
     if (d.parentId && !roots.find((r) => r.id === d.parentId) && !orderedDisciplinas.find((o) => o.id === d.id)) {
-      orderedDisciplinas.push({ id: d.id, name: d.name, isFrente: true });
+      orderedDisciplinas.push({ id: d.id, name: d.name, isFrente: true, parentId: d.parentId });
     }
   }
 
@@ -203,6 +204,7 @@ export async function getBoletimData(
         disciplinaId: d.id,
         name: d.name,
         isFrente: d.isFrente,
+        parentId: d.parentId,
         grades: cellGrades,
         absences,
       };
