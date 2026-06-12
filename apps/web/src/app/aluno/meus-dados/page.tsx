@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@nexora/db";
-import { ShieldCheck, Download, Trash2 } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { PersonalDataPanel } from "@/components/aluno/personal-data-panel";
 
 export const metadata: Metadata = { title: "Meus Dados" };
@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Meus Dados" };
 export default async function MeusDadosPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  const { id: userId, activeTenantId: tenantId } = session.user;
+  const { id: userId } = session.user;
 
   const [user, pendingExport] = await Promise.all([
     prisma.user.findUnique({

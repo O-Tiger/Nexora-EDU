@@ -41,7 +41,7 @@ export default async function ConsentPage() {
           Seus dados não são vendidos. Podem ser compartilhados com fornecedores operacionais (armazenamento em nuvem, sistema ERP financeiro) sob contrato de processamento de dados.</p>
 
           <p><strong>4. Seus direitos (LGPD art. 18)</strong><br />
-          Você pode a qualquer momento: acessar seus dados, corrigir informações, solicitar portabilidade (exportação JSON) e solicitar a exclusão da sua conta pela página "Meus Dados".</p>
+          Você pode a qualquer momento: acessar seus dados, corrigir informações, solicitar portabilidade (exportação JSON) e solicitar a exclusão da sua conta pela página &ldquo;Meus Dados&rdquo;.</p>
 
           <p><strong>5. Retenção</strong><br />
           Dados são mantidos pelo período da matrícula e pelo prazo legal após o encerramento. Após solicitação de exclusão, os dados são anonimizados imediatamente.</p>
@@ -57,7 +57,7 @@ export default async function ConsentPage() {
         </form>
 
         <p className="mt-4 text-center text-xs text-navy-400">
-          Ao aceitar, você consente com o tratamento de dados descrito acima. Você pode revogar este consentimento a qualquer momento em "Meus Dados".
+          Ao aceitar, você consente com o tratamento de dados descrito acima. Você pode revogar este consentimento a qualquer momento em &ldquo;Meus Dados&rdquo;.
         </p>
       </div>
     </div>

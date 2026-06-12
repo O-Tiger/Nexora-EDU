@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { locales, defaultLocale, type Locale } from "@/i18n/config";
+import { locales, type Locale } from "@/i18n/config";
 import { useLocale } from "next-intl";
 
 const localeLabels: Record<Locale, string> = {
