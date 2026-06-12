@@ -9,6 +9,12 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Changed (Fase 3 — Professores como cadastro interno)
+- `packages/db`: novo model `Professor` (nome, email/telefone opcionais, sem login/senha); `TurmaDisciplina.professorId` re-aponta de `User` para `Professor` + migration
+- Professores agora são **cadastrados/excluídos por admins** (ADMIN/SUPER_ADMIN/COORDENADOR) em `/admin/secretaria/professores` — não se auto-cadastram e não autenticam
+- `ProfessoresManager`: formulário de cadastro + exclusão (remove vínculos) + lista com vínculos por turma/disciplina
+- Ano letivo: campos de data agora em **dd/mm/aaaa** com máscara e validação (`AnoLetivoForm`)
+
 ### Added (Fase 3 — Grade de horários, professores e cores)
 - `packages/db`: `Disciplina.color`, `TurmaDisciplina.professorId` (FK User), `Turma.horarioConfig` (Json) + migration
 - **Grade visual** estilo grade escolar: horários por linha (início/fim), cores por disciplina, professor por célula; preview inline (iframe) + **download PDF** (paisagem) em `/api/secretaria/horario`

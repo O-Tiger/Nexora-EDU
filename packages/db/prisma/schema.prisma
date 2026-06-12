@@ -40,7 +40,6 @@ model User {
   sentMessages     DirectMessage[]  @relation("DMSender")
   receivedMessages DirectMessage[]  @relation("DMReceiver")
   turmaEnrollments TurmaEnrollment[] @relation("StudentTurmaEnrollments")
-  professorDisciplinas TurmaDisciplina[] @relation("ProfessorDisciplinas")
 
   @@index([email])
 }
@@ -829,10 +828,26 @@ model TurmaDisciplina {
 
   turma      Turma      @relation(fields: [turmaId], references: [id], onDelete: Cascade)
   disciplina Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
-  professor  User?      @relation("ProfessorDisciplinas", fields: [professorId], references: [id])
+  professor  Professor? @relation(fields: [professorId], references: [id], onDelete: SetNull)
 
   @@unique([turmaId, disciplinaId])
   @@index([tenantId, turmaId])
+}
+
+/// Professor: cadastro interno (sem login/senha), gerenciado por admins.
+/// Usado apenas para vincular disciplinas na grade — não autentica.
+model Professor {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  email     String?
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  turmaDisciplinas TurmaDisciplina[]
+
+  @@index([tenantId, active])
 }
 
 /// Nota de um aluno numa disciplina, por período (trimestre) e tipo de avaliação.
