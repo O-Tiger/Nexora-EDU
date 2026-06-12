@@ -30,6 +30,10 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 - `apps/web/src/app/admin/secretaria/alunos/[studentId]`: ficha do aluno — dados pessoais, responsáveis (CRUD), histórico de turmas por ano letivo
 - `AdminSidebar`: link "Secretaria" adicionado
 
+## [v0.2.0] - 2026-06-12
+
+> Primeiro release em `main` — Fases 0, 1 e 2 (MVP EAD completo + integrações, LGPD e acessibilidade).
+
 ### Added (Fase 2 — WCAG / PWA / i18n)
 - **WCAG 2.1 AA**: skip-to-content link em todas as páginas (SC 2.4.1); `id="main-content"` + `tabIndex={-1}` em `<main>`; `aria-label` em `<aside>` e `<nav>`; `aria-current="page"` nos links de navegação ativos; `aria-hidden="true"` em ícones decorativos; `focus-visible` global com anel teal; `prefers-reduced-motion` desativa animações; `focus-ring` utility aplicado aos links de navegação
 - **PWA**: `public/manifest.webmanifest` (name, icons 192/512, start_url, display standalone, shortcuts); meta tags `theme-color`, `viewport`, `apple-mobile-web-app-capable` no root layout via `Viewport` export; `@ducanh2912/next-pwa` integrado ao `next.config.ts` (desabilitado em dev, Workbox em produção)
