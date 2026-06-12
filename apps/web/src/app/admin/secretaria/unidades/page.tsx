@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
-import { redirect, notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Building2, ChevronRight, Users } from "lucide-react";
-import { Button, Badge } from "@nexora/ui";
+import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
 import { getUnidades } from "@nexora/db/src/queries/secretaria";
 
@@ -39,17 +39,6 @@ export default async function UnidadesPage({
       })
     : [];
   const turmaCountMap = new Map(turmaCounts.map((t) => [t.unidadeId, t._count._all]));
-
-  // Count active enrollments per unidade for this year
-  const enrollmentCounts = anoLetivoId
-    ? await prisma.turmaEnrollment.groupBy({
-        by: ["tenantId"],
-        where: { tenantId, anoLetivoId, status: "ATIVA",
-          turma: { unidadeId: { in: unidades.map((u) => u.id) } },
-        },
-        _count: { _all: true },
-      })
-    : [];
 
   return (
     <div className="space-y-6">

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Users, ClipboardList } from "lucide-react";
+import { ArrowLeft, Users, ClipboardList } from "lucide-react";
 import { Button, Badge } from "@nexora/ui";
 import { getTurmaById } from "@nexora/db/src/queries/secretaria";
 import { ETAPA_LABELS, type Etapa } from "@nexora/validators";

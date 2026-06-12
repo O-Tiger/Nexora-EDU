@@ -4,7 +4,6 @@ import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@nexora/db";
-import { z } from "zod";
 import {
   UnidadeSchema, AnoLetivoSchema, TurmaSchema, TurmaEnrollmentSchema, GuardianSchema,
   buildTurmaCode,

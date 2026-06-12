@@ -20,7 +20,7 @@ const FORMATS: { value: Format; label: string }[] = [
   { value: "doc", label: "Word (.doc)" },
 ];
 
-export function BoletimGenerator({ turmaId, turmaCode, students }: Props) {
+export function BoletimGenerator({ turmaId, students }: Props) {
   const [format, setFormat] = useState<Format>("pdf");
 
   function url(enrollmentId?: string) {
