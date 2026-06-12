@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button, Input, Badge, toast } from "@nexora/ui";
 import { Plus, Trash2, FileCheck2 } from "lucide-react";
 import { createAssessmentAction, publishAssessmentAction, deleteAssessmentAction } from "@/actions/assessments";
+import { useConfirm } from "@/hooks/use-confirm";
 
 interface Item {
   id: string;
@@ -25,6 +26,7 @@ export function AssessmentManager({ courseId, initial }: Props) {
   const [items, setItems] = useState(initial);
   const [title, setTitle] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   function create() {
     const t = title.trim();
@@ -52,14 +54,15 @@ export function AssessmentManager({ courseId, initial }: Props) {
     });
   }
 
-  function remove(id: string) {
-    if (!confirm("Excluir esta avaliação e suas questões/submissões?")) return;
+  async function remove(id: string) {
+    if (!await confirm({ title: "Excluir avaliação", description: "Excluir esta avaliação e suas questões/submissões?", confirmLabel: "Excluir", confirmVariant: "destructive" })) return;
     setItems((prev) => prev.filter((it) => it.id !== id));
     startTransition(() => deleteAssessmentAction(id, courseId));
   }
 
   return (
     <div className="space-y-3">
+      <ConfirmDialog />
       <div className="flex gap-2">
         <Input
           placeholder="Título da nova avaliação"

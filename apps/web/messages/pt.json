@@ -1,0 +1,59 @@
+{
+  "common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "create": "Criar",
+    "loading": "Carregando...",
+    "error": "Ocorreu um erro",
+    "success": "Operação realizada",
+    "confirm": "Confirmar",
+    "back": "Voltar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "noResults": "Nenhum resultado encontrado",
+    "required": "Campo obrigatório"
+  },
+  "nav": {
+    "home": "Início",
+    "courses": "Meus Cursos",
+    "assessments": "Avaliações",
+    "communication": "Comunicação",
+    "myData": "Meus Dados",
+    "logout": "Sair",
+    "admin": "Admin",
+    "students": "Alunos",
+    "enrollments": "Matrículas"
+  },
+  "auth": {
+    "login": "Entrar",
+    "email": "E-mail",
+    "password": "Senha",
+    "forgotPassword": "Esqueci minha senha"
+  },
+  "courses": {
+    "title": "Cursos",
+    "empty": "Nenhum curso ainda",
+    "emptyDescription": "Você ainda não está matriculado em nenhum curso.",
+    "markComplete": "Marcar como concluída",
+    "completed": "Concluída",
+    "progress": "{completed} / {total} aulas"
+  },
+  "assessments": {
+    "title": "Avaliações",
+    "empty": "Nenhuma avaliação disponível",
+    "submit": "Enviar respostas",
+    "score": "Nota: {score}",
+    "passed": "Aprovado",
+    "failed": "Reprovado"
+  },
+  "errors": {
+    "notFound": "Página não encontrada",
+    "notFoundDescription": "A página que você procura não existe.",
+    "forbidden": "Acesso negado",
+    "forbiddenDescription": "Você não tem permissão para acessar esta área.",
+    "serverError": "Algo deu errado",
+    "serverErrorDescription": "Seus dados estão seguros. Tente novamente."
+  }
+}

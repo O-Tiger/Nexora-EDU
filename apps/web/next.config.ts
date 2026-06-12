@@ -1,4 +1,17 @@
 import type { NextConfig } from "next";
+import withPWAInit from "@ducanh2912/next-pwa";
+import createNextIntlPlugin from "next-intl/plugin";
+
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
+const withPWA = withPWAInit({
+  dest: "public",
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
+  reloadOnOnline: true,
+  disable: process.env.NODE_ENV === "development",
+  workboxOptions: { disableDevLogs: true },
+});
 
 const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
@@ -11,14 +24,11 @@ const nextConfig: NextConfig = {
   },
   webpack(config) {
     config.ignoreWarnings = [
-      // Dynamic require do OpenTelemetry (vem do Sentry)
       { module: /@opentelemetry\/instrumentation/ },
-      // jose usa CompressionStream/DecompressionStream (Node-only) mas o middleware
-      // só usa getToken (Edge-safe) — este warning é transitivo e inofensivo.
       { module: /jose\/dist\/webapi\/lib\/deflate/ },
     ];
     return config;
   },
 };
 
-export default nextConfig;
+export default withPWA(withNextIntl(nextConfig));

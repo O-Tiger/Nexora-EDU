@@ -21,7 +21,12 @@ export default async function StudentsPage() {
   if (!session) redirect("/login");
 
   const students = await prisma.tenantMembership.findMany({
-    where: { tenantId: session.user.activeTenantId, role: "ALUNO", active: true },
+    where: {
+      tenantId: session.user.activeTenantId,
+      role: "ALUNO",
+      active: true,
+      user: { anonymizedAt: null },
+    },
     include: {
       user: { select: { id: true, name: true, email: true, createdAt: true } },
     },

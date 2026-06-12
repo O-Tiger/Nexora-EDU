@@ -27,10 +27,10 @@ const UPLOAD_EXPIRES = 5 * 60;
  * Gera uma presigned URL para DOWNLOAD de um arquivo (PDF, etc).
  * Nunca expor fileKey diretamente ao client — sempre resolver server-side.
  */
-export async function getPresignedDownloadUrl(fileKey: string): Promise<string> {
+export async function getPresignedDownloadUrl(fileKey: string, expiresIn = DOWNLOAD_EXPIRES): Promise<string> {
   const client = getR2Client();
   const command = new GetObjectCommand({ Bucket: BUCKET, Key: fileKey });
-  return getSignedUrl(client, command, { expiresIn: DOWNLOAD_EXPIRES });
+  return getSignedUrl(client, command, { expiresIn });
 }
 
 /**

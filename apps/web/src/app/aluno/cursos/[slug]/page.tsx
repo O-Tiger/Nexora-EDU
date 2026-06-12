@@ -2,6 +2,7 @@ import { auth } from "@nexora/auth";
 import { redirect, notFound } from "next/navigation";
 import { getCourseBySlug } from "@nexora/db/src/queries/courses";
 import { prisma } from "@nexora/db";
+import type { LiveSessionData } from "@/components/aluno/course-player";
 import type { Metadata } from "next";
 import { CoursePlayer } from "@/components/aluno/course-player";
 
@@ -35,6 +36,16 @@ export default async function CoursePlayerPage({ params, searchParams }: {
     enrollmentId = enrollment.id;
   }
 
+  // LiveSessions das aulas LIVE do curso
+  const allLessonIds = course.modules.flatMap((m) => m.lessons.map((l) => l.id));
+  const liveSessions = await prisma.liveSession.findMany({
+    where: { lessonId: { in: allLessonIds } },
+    select: { id: true, lessonId: true, meetingUrl: true, startAt: true, durationMin: true, status: true, recordingUrl: true },
+  });
+  const liveByLesson = new Map<string, LiveSessionData>(
+    liveSessions.map((s) => [s.lessonId, { ...s, status: s.status as LiveSessionData["status"] }]),
+  );
+
   // Progresso do aluno
   const completedLessonIds = enrollmentId
     ? (await prisma.lessonProgress.findMany({
@@ -44,7 +55,9 @@ export default async function CoursePlayerPage({ params, searchParams }: {
     : [];
 
   // Aula atual: a passada na query string ou a primeira não concluída
-  const allLessons = course.modules.flatMap((m) => m.lessons);
+  const allLessons = course.modules.flatMap((m) =>
+    m.lessons.map((l) => ({ ...l, liveSession: liveByLesson.get(l.id) ?? null })),
+  );
   const activeLesson =
     allLessons.find((l) => l.id === currentLessonId) ??
     allLessons.find((l) => !completedLessonIds.includes(l.id)) ??

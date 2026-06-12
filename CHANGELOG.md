@@ -9,6 +9,51 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 2 — WCAG / PWA / i18n)
+- **WCAG 2.1 AA**: skip-to-content link em todas as páginas (SC 2.4.1); `id="main-content"` + `tabIndex={-1}` em `<main>`; `aria-label` em `<aside>` e `<nav>`; `aria-current="page"` nos links de navegação ativos; `aria-hidden="true"` em ícones decorativos; `focus-visible` global com anel teal; `prefers-reduced-motion` desativa animações; `focus-ring` utility aplicado aos links de navegação
+- **PWA**: `public/manifest.webmanifest` (name, icons 192/512, start_url, display standalone, shortcuts); meta tags `theme-color`, `viewport`, `apple-mobile-web-app-capable` no root layout via `Viewport` export; `@ducanh2912/next-pwa` integrado ao `next.config.ts` (desabilitado em dev, Workbox em produção)
+- **i18n**: `next-intl` instalado; mensagens pt/en/es em `apps/web/messages/`; locale detectado por cookie `NEXT_LOCALE`; `NextIntlClientProvider` no root layout; `LocaleSwitcher` no `StudentSidebar` (PT / EN / ES); sem prefixo de URL para preservar `typedRoutes`
+
+### Added (Fase 2 — LGPD)
+- `packages/db`: campos `User.consentedAt` e `User.anonymizedAt`; model `UserDataExport` (PENDING/READY/EXPIRED) + migration manual
+- `apps/web`: gate de consentimento no layout `/aluno` — redireciona para `/consentimento` se `consentedAt` for null
+- `apps/web`: página `/consentimento` com termos e política de privacidade, botão de aceite que persiste `consentedAt`
+- `apps/web`: `/aluno/meus-dados` — exibe dados pessoais, exporta JSON via R2 (presigned URL 24h), exclusão de conta com anonimização imediata
+- `apps/web`: API `/api/meus-dados/export` — coleta dados (perfil, matrículas, submissões, fórum, mensagens, auditlog), faz upload ao R2, retorna presigned URL 24h
+- `apps/web`: server actions `acceptConsentAction`, `requestDataExportAction`, `requestAccountDeletionAction` com rate limit (1 export/24h) e auditlog em todos os eventos LGPD
+- `apps/web`: link "Meus Dados" adicionado ao `StudentSidebar`
+- `apps/web/src/lib/r2.ts`: `getPresignedDownloadUrl` aceita `expiresIn` customizado
+
+### Added (Fase 2 — Digisac + Omie)
+- `packages/db`: campo `User.phone` (E.164 sem '+'); models `WhatsAppTemplate` (templates por evento/tenant, com placeholders `{{name}}` etc.) e `OmieSync` (estado de sincronia matrícula↔Omie) + migration manual
+- `packages/notifications`: implementação real do cliente Digisac — `sendWhatsApp()` faz POST para a API com fallback silencioso quando `DIGISAC_TOKEN`/`DIGISAC_SUBDOMAIN` não estão presentes
+- `apps/web/src/lib/whatsapp.ts`: helper `sendWhatsAppEvent()` que resolve template do banco, renderiza `{{placeholders}}` e despacha via Digisac
+- `apps/web/src/lib/omie.ts`: cliente JSON-RPC Omie — `upsertOmieClient()`, `createOmieReceivable()`, `syncEnrollmentToOmie()` (fire-and-forget com persistência em OmieSync; skipa `inst_b`)
+- `apps/web`: `enrollUserAction` dispara WhatsApp `enrollment.created` + sync Omie em fire-and-forget após matrícula
+- `apps/web`: `reactivateEnrollmentAction` dispara WhatsApp `enrollment.reactivated`
+- `apps/web`: cron `live-reminders` envia WhatsApp `live.reminder` com `{{name}}`, `{{lesson}}`, `{{date}}`, `{{time}}`
+- `apps/web`: webhook `/api/webhooks/digisac` — valida bearer token, rota mensagem inbound para `DirectMessage` pelo telefone do usuário
+- `apps/web`: webhook `/api/webhooks/omie` — valida `X-Omie-Token`, processa `ContaReceberPaga`/`ContaReceberCancelada`, registra em AuditLog
+- `apps/web`: admin gerencia templates em `/admin/comunicacao/whatsapp` — CRUD por evento com preview de placeholders e toggle ativo/inativo
+- `.env.example`: adicionados `DIGISAC_WEBHOOK_SECRET` e `OMIE_WEBHOOK_SECRET`
+
+### Added (Fase 2 — Aulas ao vivo)
+- `packages/db`: models `LiveSession` (agendamento, URL, status, gravação) e `LiveAttendance` (presença automática) + migration; queries CRUD, registro de presença e conclusão automática de aula ao vivo
+- `packages/validators`: schema Zod de criação/atualização de sessão com validação de URL e data futura
+- `apps/web`: sala de espera com countdown server-side + embed iframe (Zoom/Meet/Teams) no `CoursePlayer`
+- `apps/web`: admin agenda, inicia, encerra e vincula gravação YouTube em `/admin/cursos/[id]/aulas/[lessonId]/live`; ícone de atalho nas aulas LIVE no editor de módulos
+- `apps/web`: presença automática registrada ao aluno entrar na sala; aula marcada como concluída
+- `apps/web`: cron `/api/cron/live-reminders` que registra lembretes em AuditLog 15 min antes (pronto para plugar Digisac)
+
+### Added (Fase 2 — Comunicação)
+- `packages/db`: models `Announcement`, `ForumThread`, `ForumReply`, `DirectMessage`, `KnowledgeEntry` + migration; queries de avisos, fórum, mensagens e base de conhecimento
+- `packages/validators`: schemas Zod de avisos, fórum, mensagens diretas e chatbot
+- `apps/web`: avisos segmentados (plataforma/curso) com pin, admin publica/exclui em `/admin/comunicacao`
+- `apps/web`: fórum por módulo — tópicos, respostas aninhadas (1 nível), bloqueio e pin pelo staff
+- `apps/web`: mensagens diretas aluno ↔ admin com leitura automática e badge de não-lidas
+- `apps/web`: chatbot Groq llama3-8b com RAG (base de conhecimento editável por tenant), escalonamento para Digisac registrado em AuditLog
+- `apps/web`: `ChatbotWidget` flutuante no layout do aluno; base de conhecimento editável em `/admin/comunicacao`
+
 ### Added (Fase 2 — Avaliações)
 - `packages/db`: models `Assessment`, `Question`, `Submission` (+ enums) e `Course.gradeFormula`; queries de avaliações e submissões com auto-correção
 - `packages/validators`: schemas Zod de avaliação, questão (MC/V-F/dissertativa) e respostas

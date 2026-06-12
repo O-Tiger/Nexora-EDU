@@ -21,13 +21,24 @@ model User {
   name         String
   /// Opcional: vínculo cross-tenant é feito por email; CPF pode ser complementado depois
   cpf          String?  @unique
+  /// Telefone no formato E.164 sem '+' (ex: "5511999999999") — usado para WhatsApp via Digisac
+  phone        String?
   avatarUrl    String?
+  /// Data de aceite dos termos e política de privacidade (LGPD). Null = não consentiu ainda.
+  consentedAt  DateTime?
+  /// Null = conta ativa. Preenchido quando usuário solicita exclusão de dados (LGPD art. 18).
+  anonymizedAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships TenantMembership[]
-  auditLogs   AuditLog[]
-  onboarding  UserOnboarding[]
+  memberships    TenantMembership[]
+  auditLogs      AuditLog[]
+  onboarding     UserOnboarding[]
+  announcements  Announcement[]
+  forumThreads   ForumThread[]  @relation("ForumThreadAuthor")
+  forumReplies   ForumReply[]   @relation("ForumReplyAuthor")
+  sentMessages   DirectMessage[] @relation("DMSender")
+  receivedMessages DirectMessage[] @relation("DMReceiver")
 
   @@index([email])
 }
@@ -76,9 +87,10 @@ model Course {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  modules     Module[]
-  enrollments Enrollment[]
-  assessments Assessment[]
+  modules       Module[]
+  enrollments   Enrollment[]
+  assessments   Assessment[]
+  announcements Announcement[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -99,8 +111,9 @@ model Module {
   /// ID do módulo que deve estar concluído antes de desbloquear este
   prerequisiteId String?
 
-  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessons Lesson[]
+  course   Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons  Lesson[]
+  threads  ForumThread[]
 
   @@index([courseId, position])
 }
@@ -121,10 +134,56 @@ model Lesson {
   url      String?
   duration Int? // segundos
 
-  module   Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  progress LessonProgress[]
+  module      Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress    LessonProgress[]
+  liveSession LiveSession?
 
   @@index([moduleId, position])
+}
+
+/// Sessão ao vivo vinculada a uma aula do tipo LIVE.
+model LiveSession {
+  id         String          @id @default(cuid())
+  tenantId   String
+  lessonId   String          @unique
+  /// URL da reunião: Zoom, Google Meet, Teams, etc.
+  meetingUrl String
+  /// Data/hora de início agendada
+  startAt    DateTime
+  /// Duração prevista em minutos
+  durationMin Int            @default(60)
+  status     LiveStatus      @default(SCHEDULED)
+  /// Link da gravação no YouTube após o evento
+  recordingUrl String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  lesson     Lesson          @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  attendances LiveAttendance[]
+
+  @@index([tenantId, startAt])
+  @@index([tenantId, status])
+}
+
+enum LiveStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELLED
+}
+
+/// Registro de presença de um aluno numa sessão ao vivo.
+model LiveAttendance {
+  id            String      @id @default(cuid())
+  liveSessionId String
+  enrollmentId  String
+  joinedAt      DateTime    @default(now())
+  leftAt        DateTime?
+
+  liveSession LiveSession @relation(fields: [liveSessionId], references: [id], onDelete: Cascade)
+
+  @@unique([liveSessionId, enrollmentId])
+  @@index([liveSessionId])
 }
 
 enum LessonType {
@@ -313,6 +372,105 @@ model Certificate {
 
 // ─── AUDITORIA ────────────────────────────────────────────────────────────────
 
+// ─── COMUNICAÇÃO ─────────────────────────────────────────────────────────────
+
+/// Aviso publicado pelo admin — visível a todos os alunos do escopo.
+model Announcement {
+  id        String             @id @default(cuid())
+  tenantId  String
+  authorId  String
+  scope     AnnouncementScope  @default(PLATFORM)
+  /// courseId obrigatório quando scope = COURSE
+  courseId  String?
+  title     String
+  body      String
+  pinned    Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  author User    @relation(fields: [authorId], references: [id])
+  course Course? @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, scope, createdAt])
+  @@index([tenantId, courseId])
+}
+
+enum AnnouncementScope {
+  PLATFORM
+  COURSE
+}
+
+/// Tópico de fórum ligado a um módulo de curso.
+model ForumThread {
+  id        String   @id @default(cuid())
+  tenantId  String
+  moduleId  String
+  authorId  String
+  title     String
+  body      String
+  pinned    Boolean  @default(false)
+  locked    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  module  Module        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  author  User          @relation("ForumThreadAuthor", fields: [authorId], references: [id])
+  replies ForumReply[]
+
+  @@index([tenantId, moduleId, createdAt])
+}
+
+/// Resposta a um tópico de fórum. Suporta 1 nível de aninhamento (parentId).
+model ForumReply {
+  id        String   @id @default(cuid())
+  tenantId  String
+  threadId  String
+  authorId  String
+  parentId  String?
+  body      String
+  createdAt DateTime @default(now())
+
+  thread  ForumThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author  User         @relation("ForumReplyAuthor", fields: [authorId], references: [id])
+  parent  ForumReply?  @relation("ReplyTree", fields: [parentId], references: [id])
+  replies ForumReply[] @relation("ReplyTree")
+
+  @@index([tenantId, threadId, createdAt])
+}
+
+/// Mensagem direta aluno ↔ admin. Agrupadas por threadId.
+model DirectMessage {
+  id         String   @id @default(cuid())
+  tenantId   String
+  threadId   String
+  senderId   String
+  receiverId String
+  body       String
+  readAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("DMSender",   fields: [senderId],   references: [id])
+  receiver User @relation("DMReceiver", fields: [receiverId], references: [id])
+
+  @@index([tenantId, threadId, createdAt])
+  @@index([tenantId, receiverId, readAt])
+}
+
+/// Entrada da base de conhecimento usada pelo chatbot como contexto RAG.
+model KnowledgeEntry {
+  id        String   @id @default(cuid())
+  tenantId  String
+  question  String
+  answer    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, active])
+}
+
+// ─── AUDITORIA ────────────────────────────────────────────────────────────────
+
 /// Log imutável de ações relevantes. Nunca deletar registros — apenas arquivar.
 model AuditLog {
   id       String  @id @default(cuid())
@@ -349,4 +507,72 @@ model UserOnboarding {
 
   @@unique([userId, tourId])
   @@index([userId])
+}
+
+// ─── INTEGRAÇÕES ──────────────────────────────────────────────────────────────
+
+/// Template de mensagem WhatsApp por evento, configurável pelo admin por tenant.
+/// bodyTemplate usa {{placeholders}}: {{name}}, {{course}}, {{date}}, {{link}}, etc.
+model WhatsAppTemplate {
+  id           String       @id @default(cuid())
+  tenantId     String
+  event        String
+  /// Texto do template com {{placeholders}}
+  bodyTemplate String
+  isActive     Boolean      @default(true)
+  updatedAt    DateTime     @updatedAt
+  updatedBy    String
+
+  @@unique([tenantId, event])
+  @@index([tenantId, isActive])
+}
+
+/// Rastreia a sincronização de uma matrícula com o Omie ERP.
+model OmieSync {
+  id                 String    @id @default(cuid())
+  enrollmentId       String    @unique
+  tenantId           String
+  /// ID do cliente no Omie (codigo_cliente_omie)
+  omieClientId       String?
+  /// ID da conta a receber no Omie
+  omieReceivableId   String?
+  status             OmieSyncStatus @default(PENDING)
+  lastSyncedAt       DateTime?
+  errorMessage       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([tenantId, status])
+  @@index([enrollmentId])
+}
+
+enum OmieSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+// ─── LGPD ─────────────────────────────────────────────────────────────────────
+
+/// Exportação de dados pessoais solicitada pelo usuário (art. 18 LGPD).
+/// O arquivo JSON é armazenado no R2 com presigned URL válida por 24h.
+model UserDataExport {
+  id        String             @id @default(cuid())
+  userId    String
+  tenantId  String
+  status    DataExportStatus   @default(PENDING)
+  /// Chave do arquivo JSON no R2 (vazia enquanto PENDING)
+  r2Key     String?
+  /// Momento em que a URL expira (now + 24h)
+  expiresAt DateTime?
+  createdAt DateTime           @default(now())
+
+  @@index([userId])
+  @@index([tenantId, status])
+}
+
+enum DataExportStatus {
+  PENDING
+  READY
+  EXPIRED
 }

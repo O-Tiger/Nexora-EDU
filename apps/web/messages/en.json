@@ -1,0 +1,59 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "success": "Operation successful",
+    "confirm": "Confirm",
+    "back": "Back",
+    "search": "Search",
+    "filter": "Filter",
+    "noResults": "No results found",
+    "required": "Required field"
+  },
+  "nav": {
+    "home": "Home",
+    "courses": "My Courses",
+    "assessments": "Assessments",
+    "communication": "Communication",
+    "myData": "My Data",
+    "logout": "Sign out",
+    "admin": "Admin",
+    "students": "Students",
+    "enrollments": "Enrollments"
+  },
+  "auth": {
+    "login": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password"
+  },
+  "courses": {
+    "title": "Courses",
+    "empty": "No courses yet",
+    "emptyDescription": "You are not enrolled in any courses yet.",
+    "markComplete": "Mark as complete",
+    "completed": "Completed",
+    "progress": "{completed} / {total} lessons"
+  },
+  "assessments": {
+    "title": "Assessments",
+    "empty": "No assessments available",
+    "submit": "Submit answers",
+    "score": "Score: {score}",
+    "passed": "Passed",
+    "failed": "Failed"
+  },
+  "errors": {
+    "notFound": "Page not found",
+    "notFoundDescription": "The page you are looking for does not exist.",
+    "forbidden": "Access denied",
+    "forbiddenDescription": "You do not have permission to access this area.",
+    "serverError": "Something went wrong",
+    "serverErrorDescription": "Your data is safe. Please try again."
+  }
+}

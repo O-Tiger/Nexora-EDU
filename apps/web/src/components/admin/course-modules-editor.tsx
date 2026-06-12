@@ -19,7 +19,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, toast } from "@nexora/ui";
-import { GripVertical, Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { GripVertical, Plus, Trash2, ChevronDown, ChevronRight, Video } from "lucide-react";
+import { useConfirm } from "@/hooks/use-confirm";
 import {
   createModuleAction,
   deleteModuleAction,
@@ -42,6 +44,7 @@ export function CourseModulesEditor({ courseId, modules: initialModules }: Props
   const [newModuleTitle, setNewModuleTitle] = useState("");
   const [isPending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<Set<string>>(new Set(initialModules.map((m) => m.id)));
+  const [ConfirmDialog, confirm] = useConfirm();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -80,8 +83,8 @@ export function CourseModulesEditor({ courseId, modules: initialModules }: Props
     });
   }
 
-  function removeModule(moduleId: string) {
-    if (!confirm("Excluir este módulo e todas as suas aulas?")) return;
+  async function removeModule(moduleId: string) {
+    if (!await confirm({ title: "Excluir módulo", description: "Excluir este módulo e todas as suas aulas?", confirmLabel: "Excluir", confirmVariant: "destructive" })) return;
     setModules((prev) => prev.filter((m) => m.id !== moduleId));
     startTransition(() => deleteModuleAction(courseId, moduleId));
   }
@@ -96,6 +99,7 @@ export function CourseModulesEditor({ courseId, modules: initialModules }: Props
 
   return (
     <Card>
+      <ConfirmDialog />
       <CardHeader>
         <CardTitle>Módulos</CardTitle>
       </CardHeader>
@@ -181,30 +185,34 @@ function SortableModule({
   };
 
   const [newLessonTitle, setNewLessonTitle] = useState("");
+  const [newLessonType, setNewLessonType] = useState<"VIDEO" | "PDF" | "TEXT" | "LINK" | "LIVE">("VIDEO");
   const [isPending, startTransition] = useTransition();
+  const [ConfirmDialog, confirm] = useConfirm();
 
   function addLesson() {
     if (!newLessonTitle.trim()) return;
     const title = newLessonTitle.trim();
+    const type = newLessonType;
     setNewLessonTitle("");
     startTransition(async () => {
-      const result = await createLessonAction(courseId, module.id, { title, type: "VIDEO" });
+      const result = await createLessonAction(courseId, module.id, { title, type });
       if ("error" in result) {
         toast({ variant: "destructive", title: "Erro", description: result.error });
         return;
       }
-      onLessonAdded({ id: result.lessonId, title, type: "VIDEO", position: module.lessons.length + 1 });
+      onLessonAdded({ id: result.lessonId, title, type, position: module.lessons.length + 1 });
     });
   }
 
-  function removeLesson(lessonId: string) {
-    if (!confirm("Excluir esta aula?")) return;
+  async function removeLesson(lessonId: string) {
+    if (!await confirm({ title: "Excluir aula", description: "Excluir esta aula?", confirmLabel: "Excluir", confirmVariant: "destructive" })) return;
     onLessonDeleted(lessonId);
     startTransition(() => deleteLessonAction(courseId, lessonId));
   }
 
   return (
     <div ref={setNodeRef} style={style} className="rounded-lg border border-navy-100 bg-white">
+      <ConfirmDialog />
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           {...attributes}
@@ -239,6 +247,15 @@ function SortableModule({
             <div key={lesson.id} className="flex items-center gap-2 rounded-md bg-navy-50 px-3 py-1.5 text-sm">
               <span className="flex-1 text-navy-700">{lesson.title}</span>
               <span className="text-xs text-navy-400 uppercase">{lesson.type}</span>
+              {lesson.type === "LIVE" && (
+                <Link
+                  href={`/admin/cursos/${courseId}/aulas/${lesson.id}/live` as never}
+                  className="p-0.5 text-teal-500 hover:text-teal-700 transition-colors"
+                  aria-label="Gerenciar aula ao vivo"
+                >
+                  <Video className="h-3 w-3" />
+                </Link>
+              )}
               <button
                 onClick={() => removeLesson(lesson.id)}
                 className="p-0.5 text-navy-300 hover:text-red-500 transition-colors"
@@ -250,6 +267,17 @@ function SortableModule({
           ))}
 
           <div className="flex gap-2 pt-1">
+            <select
+              value={newLessonType}
+              onChange={(e) => setNewLessonType(e.target.value as typeof newLessonType)}
+              className="h-8 rounded-md border border-navy-200 bg-white px-2 text-xs text-navy-700 shrink-0"
+            >
+              <option value="VIDEO">Vídeo</option>
+              <option value="PDF">PDF / Arquivo</option>
+              <option value="TEXT">Texto</option>
+              <option value="LINK">Link externo</option>
+              <option value="LIVE">Ao vivo</option>
+            </select>
             <Input
               placeholder="Nome da aula"
               value={newLessonTitle}
