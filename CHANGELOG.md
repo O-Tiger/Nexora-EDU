@@ -9,6 +9,13 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Added (Fase 3 — Diário de classe)
+- `packages/db`: models `RegistroAula` (turma + disciplina + data + nº de aulas + conteúdo + observações) e `PresencaAluno` (status PRESENTE/AUSENTE/JUSTIFICADA) + enum + migration
+- `packages/db/src/queries/diario.ts`: CRUD de registros, presenças e `getFaltasFromDiario()` (conta faltas por aluno/disciplina; justificada não conta)
+- `apps/web`: `/admin/secretaria/turmas/[id]/diario` — registro de aula com conteúdo ministrado + chamada (presença por aluno com toque para alternar P/F/J, "todos presentes"), lista de registros e exclusão
+- **Boletim**: faltas passam a ser contadas do diário quando há registros, com fallback à falta manual (`Attendance`)
+- `apps/web`: link "Diário" no detalhe da turma
+
 ### Added (Fase 3 — Pedagógico & Certificados)
 - `packages/db`: models `Disciplina` (auto-relação `parentId` = frente), `TurmaDisciplina`, `Grade`, `Attendance`, `CertificateTemplate` + enum `GradeKind` + migrations
 - **Disciplinas & frentes**: CRUD em `/admin/secretaria/disciplinas` — disciplinas com sub-divisões graduadas separadamente (Matemática 1/2/3)

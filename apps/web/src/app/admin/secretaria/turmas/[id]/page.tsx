@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, ClipboardList } from "lucide-react";
+import { ArrowLeft, Users, ClipboardList, BookText } from "lucide-react";
 import { Button, Badge } from "@nexora/ui";
 import { getTurmaById } from "@nexora/db/src/queries/secretaria";
 import { ETAPA_LABELS, type Etapa } from "@nexora/validators";
@@ -67,6 +67,11 @@ export default async function TurmaDetailPage({ params }: { params: Promise<{ id
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/admin/secretaria/turmas/${id}/diario` as never} className="gap-2">
+              <BookText className="h-4 w-4" /> Diário
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href={`/admin/secretaria/turmas/${id}/notas` as never} className="gap-2">
               <ClipboardList className="h-4 w-4" /> Lançar notas

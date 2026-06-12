@@ -696,6 +696,7 @@ model Turma {
   anoLetivo   AnoLetivo       @relation(fields: [anoLetivoId], references: [id])
   enrollments TurmaEnrollment[]
   disciplinas TurmaDisciplina[]
+  registros   RegistroAula[]
 
   @@unique([tenantId, anoLetivoId, code])
   @@index([tenantId, anoLetivoId])
@@ -737,6 +738,7 @@ model TurmaEnrollment {
   student     User         @relation("StudentTurmaEnrollments", fields: [studentId], references: [id])
   grades      Grade[]
   attendances Attendance[]
+  presencas   PresencaAluno[]
 
   /// Um aluno só pode estar em uma turma por ano letivo
   @@unique([studentId, anoLetivoId])
@@ -802,6 +804,7 @@ model Disciplina {
   turmaDisciplinas TurmaDisciplina[]
   grades           Grade[]
   attendances      Attendance[]
+  registros        RegistroAula[]
 
   @@index([tenantId, parentId])
   @@index([tenantId, active])
@@ -852,6 +855,7 @@ enum GradeKind {
 }
 
 /// Frequência: faltas acumuladas de um aluno numa disciplina.
+/// Usada como fallback manual quando não há diário de classe lançado.
 model Attendance {
   id           String   @id @default(cuid())
   tenantId     String
@@ -865,4 +869,47 @@ model Attendance {
 
   @@unique([enrollmentId, disciplinaId])
   @@index([tenantId, enrollmentId])
+}
+
+/// Diário de classe: registro de uma aula (turma + disciplina + data) com o
+/// conteúdo ministrado. Pode representar N aulas geminadas (quantidadeAulas).
+model RegistroAula {
+  id              String   @id @default(cuid())
+  tenantId        String
+  turmaId         String
+  disciplinaId    String
+  data            DateTime
+  /// Quantas aulas/períodos este registro representa (geminadas contam mais faltas)
+  quantidadeAulas Int      @default(1)
+  conteudo        String
+  observacoes     String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  turma      Turma           @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  presencas  PresencaAluno[]
+
+  @@index([tenantId, turmaId, disciplinaId, data])
+}
+
+/// Presença de um aluno num registro de aula.
+model PresencaAluno {
+  id           String         @id @default(cuid())
+  registroId   String
+  enrollmentId String
+  status       PresencaStatus @default(PRESENTE)
+
+  registro   RegistroAula    @relation(fields: [registroId], references: [id], onDelete: Cascade)
+  enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([registroId, enrollmentId])
+  @@index([enrollmentId])
+}
+
+enum PresencaStatus {
+  PRESENTE
+  AUSENTE
+  JUSTIFICADA
 }
