@@ -8,6 +8,8 @@ import { prisma } from "@nexora/db";
 import { getTurmasByUnidade } from "@nexora/db/src/queries/secretaria";
 import { ETAPA_LABELS, type Etapa } from "@nexora/validators";
 import { TurmaForm } from "@/components/secretaria/turma-form";
+import { InlineDeleteButton } from "@/components/secretaria/inline-delete-button";
+import { deleteTurmaAction } from "@/actions/secretaria";
 
 export const metadata: Metadata = { title: "Unidade — Turmas" };
 
@@ -91,28 +93,39 @@ export default async function UnidadeTurmasPage({
             </h2>
             <div className="rounded-lg border border-navy-100 bg-white divide-y divide-navy-50">
               {list.map((t) => (
-                <Link
-                  key={t.id}
-                  href={`/admin/secretaria/turmas/${t.id}` as never}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-navy-50 transition-colors"
-                >
-                  <div>
-                    <span className="font-mono font-semibold text-navy-900">{t.code}</span>
-                    <span className="ml-2 text-xs text-navy-400">{PERIODO_LABELS[t.periodo]}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1 text-sm text-navy-600">
-                      <Users className="h-3.5 w-3.5" />
-                      {t._count.enrollments}/{t.maxStudents}
-                    </span>
-                    <Badge
-                      variant={t._count.enrollments >= t.maxStudents ? "destructive" : "secondary"}
-                      className="text-xs"
-                    >
-                      {t._count.enrollments >= t.maxStudents ? "Lotada" : "Vagas"}
-                    </Badge>
-                  </div>
-                </Link>
+                <div key={t.id} className="flex items-center gap-2 px-4 py-3 hover:bg-navy-50 transition-colors">
+                  <Link
+                    href={`/admin/secretaria/turmas/${t.id}` as never}
+                    className="flex flex-1 items-center justify-between min-w-0"
+                  >
+                    <div>
+                      <span className="font-mono font-semibold text-navy-900">{t.code}</span>
+                      <span className="ml-2 text-xs text-navy-400">{PERIODO_LABELS[t.periodo]}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-sm text-navy-600">
+                        <Users className="h-3.5 w-3.5" />
+                        {t._count.enrollments}/{t.maxStudents}
+                      </span>
+                      <Badge
+                        variant={t._count.enrollments >= t.maxStudents ? "destructive" : "secondary"}
+                        className="text-xs"
+                      >
+                        {t._count.enrollments >= t.maxStudents ? "Lotada" : "Vagas"}
+                      </Badge>
+                    </div>
+                  </Link>
+                  <InlineDeleteButton
+                    action={deleteTurmaAction.bind(null, t.id)}
+                    confirmTitle={`Excluir turma ${t.code}?`}
+                    confirmDescription={
+                      t._count.enrollments > 0
+                        ? "Esta turma tem alunos matriculados — cancele as matrículas antes de excluir."
+                        : "Esta ação é irreversível."
+                    }
+                    ariaLabel={`Excluir turma ${t.code}`}
+                  />
+                </div>
               ))}
             </div>
           </section>
