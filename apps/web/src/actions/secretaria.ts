@@ -10,8 +10,8 @@ import {
   buildTurmaCode,
 } from "@nexora/validators";
 import {
-  createUnidade, updateUnidade,
-  createAnoLetivo, updateAnoLetivoStatus,
+  createUnidade, updateUnidade, deleteUnidade,
+  createAnoLetivo, updateAnoLetivoStatus, deleteAnoLetivo,
   createTurma, deleteTurma,
   enrollStudentInTurma, updateTurmaEnrollmentStatus,
   createGuardian, deleteGuardian,
@@ -49,6 +49,18 @@ export async function toggleUnidadeAction(id: string, active: boolean) {
   revalidatePath("/admin/secretaria");
 }
 
+export async function deleteUnidadeAction(id: string) {
+  const { tenantId } = await requireAdmin();
+  try {
+    await deleteUnidade(id, tenantId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao excluir unidade" };
+  }
+  revalidatePath("/admin/secretaria");
+  revalidatePath("/admin/secretaria/unidades");
+  return { success: true };
+}
+
 // ─── Anos letivos ─────────────────────────────────────────────────────────────
 
 export async function createAnoLetivoAction(formData: FormData) {
@@ -76,6 +88,17 @@ export async function updateAnoLetivoStatusAction(id: string, status: "PLANEJADO
   const { tenantId } = await requireAdmin();
   await updateAnoLetivoStatus(id, tenantId, status);
   revalidatePath("/admin/secretaria");
+}
+
+export async function deleteAnoLetivoAction(id: string) {
+  const { tenantId } = await requireAdmin();
+  try {
+    await deleteAnoLetivo(id, tenantId);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Falha ao excluir ano letivo" };
+  }
+  revalidatePath("/admin/secretaria");
+  return { success: true };
 }
 
 // ─── Turmas ───────────────────────────────────────────────────────────────────

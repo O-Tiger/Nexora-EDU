@@ -9,7 +9,8 @@ import { getAnosLetivos, getAnoLetivoAtivo, getUnidades, getSecretariaOverview }
 import { AnoLetivoForm } from "@/components/secretaria/ano-letivo-form";
 import { UnidadeForm } from "@/components/secretaria/unidade-form";
 import { AnoLetivoStatusBadge } from "@/components/secretaria/ano-letivo-status-badge";
-import { updateAnoLetivoStatusAction } from "@/actions/secretaria";
+import { InlineDeleteButton } from "@/components/secretaria/inline-delete-button";
+import { deleteAnoLetivoAction, deleteUnidadeAction } from "@/actions/secretaria";
 
 export const metadata: Metadata = { title: "Secretaria" };
 
@@ -95,6 +96,12 @@ export default async function SecretariaPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <AnoLetivoStatusBadge status={al.status} id={al.id} />
+                  <InlineDeleteButton
+                    action={deleteAnoLetivoAction.bind(null, al.id)}
+                    confirmTitle={`Excluir ano letivo ${al.year}?`}
+                    confirmDescription="Só é possível excluir anos sem turmas vinculadas."
+                    ariaLabel={`Excluir ano letivo ${al.year}`}
+                  />
                   <Button variant="ghost" size="sm" asChild>
                     <Link href={`/admin/secretaria/unidades?anoLetivoId=${al.id}` as never}>
                       <ChevronRight className="h-4 w-4" />
@@ -131,13 +138,21 @@ export default async function SecretariaPage() {
                     {!u.active && " · Inativa"}
                   </p>
                 </div>
-                {anoAtivo && (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/admin/secretaria/unidades/${u.id}?anoLetivoId=${anoAtivo.id}` as never}>
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  <InlineDeleteButton
+                    action={deleteUnidadeAction.bind(null, u.id)}
+                    confirmTitle={`Excluir unidade ${u.name}?`}
+                    confirmDescription="Só é possível excluir unidades sem turmas vinculadas."
+                    ariaLabel={`Excluir unidade ${u.name}`}
+                  />
+                  {anoAtivo && (
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/admin/secretaria/unidades/${u.id}?anoLetivoId=${anoAtivo.id}` as never}>
+                        <ChevronRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
             {unidades.length === 0 && (

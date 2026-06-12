@@ -25,6 +25,12 @@ export async function updateUnidade(id: string, tenantId: string, data: Partial<
   return prisma.unidade.updateMany({ where: { id, tenantId }, data });
 }
 
+export async function deleteUnidade(id: string, tenantId: string) {
+  const turmas = await prisma.turma.count({ where: { tenantId, unidadeId: id } });
+  if (turmas > 0) throw new Error("Não é possível excluir uma unidade com turmas. Exclua as turmas primeiro.");
+  return prisma.unidade.deleteMany({ where: { id, tenantId } });
+}
+
 // ─── Anos letivos ─────────────────────────────────────────────────────────────
 
 export async function getAnosLetivos(tenantId: string) {
@@ -52,6 +58,12 @@ export async function createAnoLetivo(data: {
 
 export async function updateAnoLetivoStatus(id: string, tenantId: string, status: AnoLetivoStatus) {
   return prisma.anoLetivo.updateMany({ where: { id, tenantId }, data: { status } });
+}
+
+export async function deleteAnoLetivo(id: string, tenantId: string) {
+  const turmas = await prisma.turma.count({ where: { tenantId, anoLetivoId: id } });
+  if (turmas > 0) throw new Error("Não é possível excluir um ano letivo com turmas. Exclua as turmas primeiro.");
+  return prisma.anoLetivo.deleteMany({ where: { id, tenantId } });
 }
 
 // ─── Turmas ───────────────────────────────────────────────────────────────────
