@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button, toast } from "@nexora/ui";
+import { Button } from "@nexora/ui";
 import { Download, Trash2, ShieldCheck, User, Mail, Phone, CreditCard, Clock } from "lucide-react";
 import { requestDataExportAction, requestAccountDeletionAction } from "@/actions/lgpd";
 import { useConfirm } from "@/hooks/use-confirm";
