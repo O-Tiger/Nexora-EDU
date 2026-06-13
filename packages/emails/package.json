@@ -9,7 +9,7 @@
     "preview": "email dev --dir src/templates"
   },
   "dependencies": {
-    "@react-email/components": "^0.0.30",
+    "@react-email/components": "^1.0.12",
     "@react-email/render": "^1.0.0",
     "resend": "^4.0.0"
   },
