@@ -4,14 +4,18 @@ import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createProfessor, deleteProfessor } from "@nexora/db/src/queries/professores";
+import {
+  createProfessor,
+  deleteProfessor,
+} from "@nexora/db/src/queries/professores";
 
 /** Apenas papéis com acesso interno podem cadastrar/excluir professores. */
 async function requireInternal() {
   const session = await auth();
   if (!session) redirect("/login");
   const { role, activeTenantId } = session.user;
-  if (role !== "ADMINISTRATOR" && role !== "OWNER" && role !== "ASSISTANT") redirect("/unauthorized");
+  if (role !== "ADMINISTRATOR" && role !== "OWNER" && role !== "ASSISTANT")
+    redirect("/unauthorized");
   return { tenantId: activeTenantId };
 }
 
@@ -28,7 +32,8 @@ export async function createProfessorAction(formData: FormData) {
     email: formData.get("email") || undefined,
     phone: formData.get("phone") || undefined,
   });
-  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? "Dados inválidos" };
+  if (!parsed.success)
+    return { error: parsed.error.errors[0]?.message ?? "Dados inválidos" };
 
   await createProfessor({
     tenantId,

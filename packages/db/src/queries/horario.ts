@@ -1,5 +1,5 @@
 import { prisma } from "../client";
-import type { TipoEvento, Prisma } from "@prisma/client";
+import type { TipoEvento, Prisma, FrequenciaAula } from "@prisma/client";
 
 export type HorarioSlotConfig = { ordem: number; inicio: string; fim: string };
 export type HorarioConfig = { slots: HorarioSlotConfig[]; sabado: boolean };
@@ -18,13 +18,19 @@ export async function getHorario(tenantId: string, turmaId: string) {
 export async function setHorario(
   tenantId: string,
   turmaId: string,
-  slots: { diaSemana: number; ordem: number; disciplinaId: string }[],
+  slots: { diaSemana: number; ordem: number; disciplinaId: string; frequencia?: FrequenciaAula }[],
   config: HorarioConfig,
 ) {
   await prisma.$transaction([
     prisma.horarioAula.deleteMany({ where: { tenantId, turmaId } }),
     prisma.horarioAula.createMany({
-      data: slots.map((s) => ({ tenantId, turmaId, diaSemana: s.diaSemana, ordem: s.ordem, disciplinaId: s.disciplinaId })),
+      data: slots.map((s) => ({
+        tenantId, turmaId,
+        diaSemana: s.diaSemana,
+        ordem: s.ordem,
+        disciplinaId: s.disciplinaId,
+        frequencia: s.frequencia ?? "SEMANAL",
+      })),
     }),
     prisma.turma.update({ where: { id: turmaId }, data: { horarioConfig: config as unknown as Prisma.InputJsonValue } }),
   ]);
@@ -66,6 +72,7 @@ export async function getHorarioRenderData(tenantId: string, turmaId: string) {
       disciplinaName: h.disciplina.name,
       color: h.disciplina.color,
       professor: professorByDisc.get(h.disciplinaId) ?? null,
+      frequencia: h.frequencia,
     })),
   };
 }

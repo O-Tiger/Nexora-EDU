@@ -19,6 +19,7 @@ const SlotSchema = z.object({
   diaSemana: z.number().int().min(1).max(7),
   ordem: z.number().int().min(1).max(12),
   disciplinaId: z.string().cuid(),
+  frequencia: z.enum(["SEMANAL", "QUINZENAL_PAR", "QUINZENAL_IMPAR"]).default("SEMANAL"),
 });
 
 const TimeRe = /^([01]\d|2[0-3]):[0-5]\d$/;

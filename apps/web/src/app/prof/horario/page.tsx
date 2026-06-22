@@ -6,7 +6,9 @@ import { getProfessorByUserId, getMeuHorario } from "@nexora/db/src/queries/prof
 
 export const metadata: Metadata = { title: "Meu Horário" };
 
-const DIAS = ["", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const DIAS: Record<number, string> = { 1: "Segunda", 2: "Terça", 3: "Quarta", 4: "Quinta", 5: "Sexta", 6: "Sábado" };
+
+type SlotEntry = { turmaCode: string; disciplinaName: string; color: string; frequencia: string };
 
 export default async function ProfHorarioPage() {
   const session = await auth();
@@ -18,19 +20,22 @@ export default async function ProfHorarioPage() {
 
   const horarios = await getMeuHorario(professor.id, activeTenantId);
 
-  // Build a map: diaSemana → ordem → slot
-  type Slot = { turmaCode: string; disciplinaName: string; color: string };
-  const grade = new Map<number, Map<number, Slot>>();
+  // grade: diaSemana → ordem → list of slots (1 for semanal, 2 for biweekly pair)
+  const grade = new Map<number, Map<number, SlotEntry[]>>();
   const maxOrdem = horarios.reduce((m, h) => Math.max(m, h.ordem), 0);
   const diasComAulas = [...new Set(horarios.map((h) => h.diaSemana))].sort();
 
   for (const h of horarios) {
     if (!grade.has(h.diaSemana)) grade.set(h.diaSemana, new Map());
-    grade.get(h.diaSemana)!.set(h.ordem, {
+    const diaMap = grade.get(h.diaSemana)!;
+    const existing = diaMap.get(h.ordem) ?? [];
+    existing.push({
       turmaCode: h.turma.code,
       disciplinaName: h.disciplina.name,
       color: h.disciplina.color ?? "#6b7280",
+      frequencia: h.frequencia,
     });
+    diaMap.set(h.ordem, existing);
   }
 
   const ordens = Array.from({ length: maxOrdem }, (_, i) => i + 1);
@@ -55,9 +60,7 @@ export default async function ProfHorarioPage() {
               <tr className="border-b border-navy-100">
                 <th className="px-3 py-2 text-left text-xs font-semibold text-navy-500 w-12">Aula</th>
                 {diasComAulas.map((d) => (
-                  <th key={d} className="px-3 py-2 text-center text-xs font-semibold text-navy-700">
-                    {DIAS[d]}
-                  </th>
+                  <th key={d} className="px-3 py-2 text-center text-xs font-semibold text-navy-700">{DIAS[d]}</th>
                 ))}
               </tr>
             </thead>
@@ -66,20 +69,44 @@ export default async function ProfHorarioPage() {
                 <tr key={ordem}>
                   <td className="px-3 py-2 text-xs font-medium text-navy-400 text-center">{ordem}ª</td>
                   {diasComAulas.map((dia) => {
-                    const slot = grade.get(dia)?.get(ordem);
-                    return (
-                      <td key={dia} className="px-2 py-1.5 text-center">
-                        {slot ? (
-                          <div
-                            className="rounded-md px-2 py-1 inline-block text-xs font-medium"
-                            style={{ backgroundColor: slot.color + "22", color: slot.color }}
-                          >
-                            <div>{slot.disciplinaName}</div>
-                            <div className="font-normal opacity-75">{slot.turmaCode}</div>
+                    const slots = grade.get(dia)?.get(ordem);
+                    if (!slots || slots.length === 0) {
+                      return <td key={dia} className="px-2 py-1.5 text-center text-navy-200 text-xs">—</td>;
+                    }
+                    // Semanal: single pill
+                    if (slots.length === 1 && slots[0]!.frequencia === "SEMANAL") {
+                      const s = slots[0]!;
+                      return (
+                        <td key={dia} className="px-2 py-1.5 text-center">
+                          <div className="rounded-md px-2 py-1 inline-block text-xs font-medium"
+                            style={{ backgroundColor: s.color + "22", color: s.color }}>
+                            <div>{s.disciplinaName}</div>
+                            <div className="font-normal opacity-75">{s.turmaCode}</div>
                           </div>
-                        ) : (
-                          <span className="text-navy-200">—</span>
-                        )}
+                        </td>
+                      );
+                    }
+                    // Biweekly: two stacked pills
+                    const par   = slots.find((s) => s.frequencia === "QUINZENAL_PAR");
+                    const impar = slots.find((s) => s.frequencia === "QUINZENAL_IMPAR");
+                    return (
+                      <td key={dia} className="px-1 py-1 align-top">
+                        <div className="space-y-1">
+                          {[par, impar].map((s, i) => {
+                            if (!s) return null;
+                            const isPar = s.frequencia === "QUINZENAL_PAR";
+                            return (
+                              <div key={i} className="rounded-md px-2 py-1 text-xs font-medium"
+                                style={{ backgroundColor: s.color + "22", color: s.color }}>
+                                <div className={`text-[10px] font-bold mb-0.5 ${isPar ? "text-amber-700" : "text-violet-700"}`}>
+                                  {isPar ? "Par" : "Ímpar"}
+                                </div>
+                                <div>{s.disciplinaName}</div>
+                                <div className="font-normal opacity-75">{s.turmaCode}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </td>
                     );
                   })}

@@ -5,9 +5,22 @@ import { Button, toast } from "@nexora/ui";
 import { Save, Plus, Minus, CalendarClock, Eye, Download } from "lucide-react";
 import { setHorarioAction } from "@/actions/horario";
 
+type Frequencia = "SEMANAL" | "QUINZENAL_PAR" | "QUINZENAL_IMPAR";
+
 interface Disciplina { id: string; name: string; color: string | null }
-interface Slot { diaSemana: number; ordem: number; disciplinaId: string }
+interface Slot { diaSemana: number; ordem: number; disciplinaId: string; frequencia?: Frequencia }
 interface TimeCfg { ordem: number; inicio: string; fim: string }
+
+// Per-cell state: semanal (single discipline) or quinzenal (two disciplines, alternating)
+type CellMode = "semanal" | "quinzenal";
+interface CellState {
+  mode: CellMode;
+  semanal: string;   // disciplinaId when mode=semanal
+  par: string;       // disciplinaId for QUINZENAL_PAR
+  impar: string;     // disciplinaId for QUINZENAL_IMPAR
+}
+
+const EMPTY_CELL: CellState = { mode: "semanal", semanal: "", par: "", impar: "" };
 
 interface Props {
   turmaId: string;
@@ -21,13 +34,28 @@ const DIAS = [
   { n: 4, label: "Quinta" }, { n: 5, label: "Sexta" }, { n: 6, label: "Sábado" },
 ];
 
+function buildInitialCells(initial: Slot[]): Map<string, CellState> {
+  const map = new Map<string, CellState>();
+  for (const s of initial) {
+    const key = `${s.diaSemana}-${s.ordem}`;
+    const freq = s.frequencia ?? "SEMANAL";
+    const existing = map.get(key) ?? { ...EMPTY_CELL };
+    if (freq === "QUINZENAL_PAR") {
+      map.set(key, { ...existing, mode: "quinzenal", par: s.disciplinaId });
+    } else if (freq === "QUINZENAL_IMPAR") {
+      map.set(key, { ...existing, mode: "quinzenal", impar: s.disciplinaId });
+    } else {
+      map.set(key, { ...existing, mode: "semanal", semanal: s.disciplinaId });
+    }
+  }
+  return map;
+}
+
 export function HorarioGrid({ turmaId, disciplinas, initial, initialConfig }: Props) {
   const initialRows = Math.max(5, initialConfig.slots.length, ...initial.map((s) => s.ordem), 0);
   const [rows, setRows] = useState(initialRows);
   const [showSat, setShowSat] = useState(initialConfig.sabado || initial.some((s) => s.diaSemana === 6));
-  const [grid, setGrid] = useState<Map<string, string>>(
-    () => new Map(initial.map((s) => [`${s.diaSemana}-${s.ordem}`, s.disciplinaId])),
-  );
+  const [cells, setCells] = useState<Map<string, CellState>>(() => buildInitialCells(initial));
   const [times, setTimes] = useState<Map<number, { inicio: string; fim: string }>>(
     () => new Map(initialConfig.slots.map((s) => [s.ordem, { inicio: s.inicio, fim: s.fim }])),
   );
@@ -37,14 +65,26 @@ export function HorarioGrid({ turmaId, disciplinas, initial, initialConfig }: Pr
   const dias = showSat ? DIAS : DIAS.slice(0, 5);
   const colorOf = (id: string) => disciplinas.find((d) => d.id === id)?.color ?? null;
 
-  function setCell(dia: number, ordem: number, disciplinaId: string) {
-    setGrid((prev) => {
-      const next = new Map(prev);
-      const key = `${dia}-${ordem}`;
-      if (disciplinaId) next.set(key, disciplinaId); else next.delete(key);
-      return next;
-    });
+  function getCell(dia: number, ordem: number): CellState {
+    return cells.get(`${dia}-${ordem}`) ?? { ...EMPTY_CELL };
   }
+
+  function updateCell(dia: number, ordem: number, patch: Partial<CellState>) {
+    const key = `${dia}-${ordem}`;
+    setCells((prev) => new Map(prev).set(key, { ...(prev.get(key) ?? { ...EMPTY_CELL }), ...patch }));
+  }
+
+  function toggleMode(dia: number, ordem: number) {
+    const cur = getCell(dia, ordem);
+    if (cur.mode === "semanal") {
+      // Switch to quinzenal: carry semanal discipline into par slot
+      updateCell(dia, ordem, { mode: "quinzenal", par: cur.semanal, impar: "", semanal: "" });
+    } else {
+      // Switch back to semanal: carry par discipline into semanal
+      updateCell(dia, ordem, { mode: "semanal", semanal: cur.par, par: "", impar: "" });
+    }
+  }
+
   function setTime(ordem: number, field: "inicio" | "fim", value: string) {
     setTimes((prev) => {
       const cur = prev.get(ordem) ?? { inicio: "", fim: "" };
@@ -54,9 +94,15 @@ export function HorarioGrid({ turmaId, disciplinas, initial, initialConfig }: Pr
 
   function save(then?: "preview" | "pdf") {
     const slots: Slot[] = [];
-    for (const [key, disciplinaId] of grid) {
+    for (const [key, cell] of cells) {
       const [dia, ordem] = key.split("-").map(Number);
-      if (dia && ordem && (showSat || dia <= 5) && ordem <= rows) slots.push({ diaSemana: dia, ordem, disciplinaId });
+      if (!dia || !ordem || (!showSat && dia > 5) || ordem > rows) continue;
+      if (cell.mode === "semanal" && cell.semanal) {
+        slots.push({ diaSemana: dia, ordem, disciplinaId: cell.semanal, frequencia: "SEMANAL" });
+      } else if (cell.mode === "quinzenal") {
+        if (cell.par)   slots.push({ diaSemana: dia, ordem, disciplinaId: cell.par,   frequencia: "QUINZENAL_PAR" });
+        if (cell.impar) slots.push({ diaSemana: dia, ordem, disciplinaId: cell.impar, frequencia: "QUINZENAL_IMPAR" });
+      }
     }
     const config = {
       slots: Array.from({ length: rows }, (_, i) => {
@@ -73,8 +119,7 @@ export function HorarioGrid({ turmaId, disciplinas, initial, initialConfig }: Pr
       if (then === "pdf") {
         const a = document.createElement("a");
         a.href = `/api/secretaria/horario?turmaId=${turmaId}&format=pdf`;
-        a.download = "";
-        document.body.appendChild(a); a.click(); a.remove();
+        a.download = ""; document.body.appendChild(a); a.click(); a.remove();
       }
     });
   }
@@ -134,19 +179,70 @@ export function HorarioGrid({ turmaId, disciplinas, initial, initialConfig }: Pr
                     </div>
                   </td>
                   {dias.map((d) => {
-                    const sel = grid.get(`${d.n}-${ordem}`) ?? "";
-                    const color = sel ? colorOf(sel) : null;
+                    const cell = getCell(d.n, ordem);
+                    const isQ = cell.mode === "quinzenal";
+                    const parColor = isQ && cell.par ? colorOf(cell.par) : null;
+                    const imparColor = isQ && cell.impar ? colorOf(cell.impar) : null;
+                    const semColor = !isQ && cell.semanal ? colorOf(cell.semanal) : null;
+
                     return (
-                      <td key={d.n} className="px-1 py-1" style={color ? { background: color + "22" } : undefined}>
-                        <select
-                          value={sel}
-                          onChange={(e) => setCell(d.n, ordem, e.target.value)}
-                          className="w-full rounded border border-navy-200 px-1.5 py-1 text-xs bg-transparent"
-                          aria-label={`${d.label} ${ordem}ª aula`}
-                        >
-                          <option value="">—</option>
-                          {disciplinas.map((disc) => <option key={disc.id} value={disc.id}>{disc.name}</option>)}
-                        </select>
+                      <td key={d.n} className="px-1 py-1 align-top min-w-[120px]">
+                        {!isQ ? (
+                          // ── Semanal mode ──────────────────────────────────
+                          <div style={semColor ? { background: semColor + "22" } : undefined} className="rounded">
+                            <select
+                              value={cell.semanal}
+                              onChange={(e) => updateCell(d.n, ordem, { semanal: e.target.value })}
+                              className="w-full rounded border border-navy-200 px-1.5 py-1 text-xs bg-transparent"
+                              aria-label={`${d.label} ${ordem}ª aula`}
+                            >
+                              <option value="">—</option>
+                              {disciplinas.map((disc) => <option key={disc.id} value={disc.id}>{disc.name}</option>)}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => toggleMode(d.n, ordem)}
+                              className="mt-0.5 w-full rounded px-1 py-0.5 text-[10px] font-medium text-navy-400 hover:bg-navy-50 text-center"
+                            >
+                              Tornar quinzenal
+                            </button>
+                          </div>
+                        ) : (
+                          // ── Quinzenal mode — two stacked selects ──────────
+                          <div className="space-y-1">
+                            <div style={parColor ? { background: parColor + "22" } : undefined} className="rounded border border-amber-200">
+                              <div className="px-1 py-0.5 text-[10px] font-bold text-amber-700 bg-amber-50 rounded-t">Semanas pares</div>
+                              <select
+                                value={cell.par}
+                                onChange={(e) => updateCell(d.n, ordem, { par: e.target.value })}
+                                className="w-full rounded-b border-t border-amber-200 px-1.5 py-1 text-xs bg-transparent"
+                                aria-label={`${d.label} ${ordem}ª aula — quinzenal par`}
+                              >
+                                <option value="">—</option>
+                                {disciplinas.map((disc) => <option key={disc.id} value={disc.id}>{disc.name}</option>)}
+                              </select>
+                            </div>
+                            <div style={imparColor ? { background: imparColor + "22" } : undefined} className="rounded border border-violet-200">
+                              <div className="px-1 py-0.5 text-[10px] font-bold text-violet-700 bg-violet-50 rounded-t">Semanas ímpares</div>
+                              <select
+                                value={cell.impar}
+                                onChange={(e) => updateCell(d.n, ordem, { impar: e.target.value })}
+                                className="w-full rounded-b border-t border-violet-200 px-1.5 py-1 text-xs bg-transparent"
+                                aria-label={`${d.label} ${ordem}ª aula — quinzenal ímpar`}
+                              >
+                                <option value="">—</option>
+                                {disciplinas.map((disc) => <option key={disc.id} value={disc.id}>{disc.name}</option>)}
+                              </select>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleMode(d.n, ordem)}
+                              className="w-full rounded px-1 py-0.5 text-[10px] font-medium text-navy-400 hover:bg-navy-50 text-center"
+                            >
+                              Tornar semanal
+                            </button>
+                          </div>
+                        )}
                       </td>
                     );
                   })}
