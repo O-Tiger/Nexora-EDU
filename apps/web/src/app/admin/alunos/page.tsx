@@ -23,7 +23,7 @@ export default async function StudentsPage() {
   const students = await prisma.tenantMembership.findMany({
     where: {
       tenantId: session.user.activeTenantId,
-      role: "ALUNO",
+      role: "STUDENT",
       active: true,
       user: { anonymizedAt: null },
     },

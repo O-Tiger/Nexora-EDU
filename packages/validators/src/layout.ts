@@ -8,6 +8,10 @@ const HexColor = z
   .string()
   .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Cor inválida (use formato #RRGGBB)");
 
+export const BG_GRADIENT_DIRS = ["to bottom", "to right", "to bottom right", "to bottom left"] as const;
+export type BgGradientDir = (typeof BG_GRADIENT_DIRS)[number];
+const GradientDir = z.enum(BG_GRADIENT_DIRS);
+
 // URL/href seguro: caminho interno (/...) ou http(s). Bloqueia javascript:, data:, etc.
 const SafeHref = z
   .string()
@@ -24,6 +28,8 @@ const HeroBlock = z.object({
   ctaText: z.string().max(60).default(""),
   ctaHref: SafeHref.default(""),
   bgColor: HexColor.default("#1A3A5C"),
+  bgGradientTo: HexColor.optional(),
+  bgGradientDir: GradientDir.default("to bottom"),
 });
 
 const RichTextBlock = z.object({
@@ -81,6 +87,8 @@ const CtaBlock = z.object({
   buttonText: z.string().max(60).default("Saiba mais"),
   buttonHref: SafeHref.default(""),
   bgColor: HexColor.default("#0D9488"),
+  bgGradientTo: HexColor.optional(),
+  bgGradientDir: GradientDir.default("to bottom"),
 });
 
 const ImageBlock = z.object({

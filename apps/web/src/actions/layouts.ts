@@ -5,6 +5,13 @@ import {
   saveDraft,
   publishBlocks,
   rollbackToVersion,
+  deleteVersion,
+  clearDraft,
+  getPageConfig,
+  setPageLive,
+  setPageUnpublished,
+  setPageArchived,
+  setPageUnarchived,
   getEditorBlocks,
   listVersions,
 } from "@nexora/db/src/queries/layouts";
@@ -14,13 +21,13 @@ import type { Prisma } from "@nexora/db";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-// Controle de acesso: edição de layout é restrita a ADMIN/SUPER_ADMIN
+// Controle de acesso: edição de layout é restrita a ADMIN/OWNER
 // (equivalente à permissão `editor:layout` da spec).
 async function requireLayoutEditor() {
   const session = await auth();
   if (!session) redirect("/login");
   const { role, activeTenantId, id } = session.user;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+  if (role !== "ADMINISTRATOR" && role !== "OWNER") {
     redirect("/unauthorized");
   }
   return { tenantId: activeTenantId, userId: id };
@@ -59,11 +66,14 @@ export async function publishLayoutAction(pageType: string, blocks: unknown) {
     userId,
   );
 
-  await createAuditLog(tenantId, userId, "layout.publish", `pageLayout:${created.id}`, {
-    pageType: r.pageType,
-    version: created.version,
-    blockCount: r.blocks.length,
-  });
+  await Promise.all([
+    createAuditLog(tenantId, userId, "layout.publish", `pageLayout:${created.id}`, {
+      pageType: r.pageType,
+      version: created.version,
+      blockCount: r.blocks.length,
+    }),
+    setPageLive(tenantId, r.pageType, userId),
+  ]);
 
   revalidatePath(`/admin/paginas/${r.pageType}`);
   revalidatePath(`/p/${r.pageType}`);
@@ -90,14 +100,74 @@ export async function rollbackLayoutAction(pageType: string, version: number) {
   return { success: true, version: created.version };
 }
 
+export async function deleteVersionAction(pageType: string, versionId: string) {
+  const { tenantId } = await requireLayoutEditor();
+  const pt = PageTypeSchema.safeParse(pageType);
+  if (!pt.success) return { error: "Tipo de página inválido" };
+  if (!versionId) return { error: "ID de versão inválido" };
+
+  const deleted = await deleteVersion(tenantId, pt.data, versionId);
+  if (!deleted) return { error: "Não é possível deletar a única versão publicada" };
+
+  revalidatePath(`/admin/paginas/${pt.data}`);
+  return { success: true };
+}
+
+export async function clearPageAction(pageType: string) {
+  const { tenantId, userId } = await requireLayoutEditor();
+  const pt = PageTypeSchema.safeParse(pageType);
+  if (!pt.success) return { error: "Tipo de página inválido" };
+
+  await clearDraft(tenantId, pt.data);
+  await saveDraft(tenantId, pt.data, [] as unknown as import("@nexora/db").Prisma.InputJsonValue, userId);
+
+  revalidatePath(`/admin/paginas/${pt.data}`);
+  return { success: true };
+}
+
+export async function unpublishPageAction(pageType: string) {
+  const { tenantId, userId } = await requireLayoutEditor();
+  const pt = PageTypeSchema.safeParse(pageType);
+  if (!pt.success) return { error: "Tipo de página inválido" };
+  await setPageUnpublished(tenantId, pt.data, userId);
+  revalidatePath(`/admin/paginas/${pt.data}`);
+  revalidatePath(`/p/${pt.data}`);
+  return { success: true };
+}
+
+export async function archivePageAction(pageType: string) {
+  const { tenantId, userId } = await requireLayoutEditor();
+  const pt = PageTypeSchema.safeParse(pageType);
+  if (!pt.success) return { error: "Tipo de página inválido" };
+  await setPageArchived(tenantId, pt.data, userId);
+  revalidatePath(`/admin/paginas/${pt.data}`);
+  revalidatePath(`/p/${pt.data}`);
+  return { success: true };
+}
+
+export async function unarchivePageAction(pageType: string) {
+  const { tenantId, userId } = await requireLayoutEditor();
+  const pt = PageTypeSchema.safeParse(pageType);
+  if (!pt.success) return { error: "Tipo de página inválido" };
+  await setPageUnarchived(tenantId, pt.data, userId);
+  revalidatePath(`/admin/paginas/${pt.data}`);
+  return { success: true };
+}
+
 // Helpers de leitura usados pelas páginas server-side do editor.
 export async function loadEditor(pageType: string) {
   const { tenantId } = await requireLayoutEditor();
   const pt = PageTypeSchema.safeParse(pageType);
   if (!pt.success) return null;
-  const [editor, versions] = await Promise.all([
+  const [editor, versions, config] = await Promise.all([
     getEditorBlocks(tenantId, pt.data),
     listVersions(tenantId, pt.data),
+    getPageConfig(tenantId, pt.data),
   ]);
-  return { editor, versions };
+  return {
+    editor,
+    versions,
+    isLive: !!config?.liveAt,
+    isArchived: !!config?.archivedAt,
+  };
 }

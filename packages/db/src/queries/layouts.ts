@@ -2,6 +2,46 @@ import { prisma } from "../client";
 import { PrismaClient } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 
+// ─── PageConfig ───────────────────────────────────────────────────────────────
+
+export async function getPageConfig(tenantId: string, pageType: string) {
+  return prisma.pageConfig.findUnique({
+    where: { tenantId_pageType: { tenantId, pageType } },
+  });
+}
+
+export async function setPageLive(tenantId: string, pageType: string, userId: string) {
+  return prisma.pageConfig.upsert({
+    where: { tenantId_pageType: { tenantId, pageType } },
+    create: { tenantId, pageType, liveAt: new Date(), archivedAt: null, updatedBy: userId },
+    update: { liveAt: new Date(), archivedAt: null, updatedBy: userId },
+  });
+}
+
+export async function setPageUnpublished(tenantId: string, pageType: string, userId: string) {
+  return prisma.pageConfig.upsert({
+    where: { tenantId_pageType: { tenantId, pageType } },
+    create: { tenantId, pageType, liveAt: null, updatedBy: userId },
+    update: { liveAt: null, updatedBy: userId },
+  });
+}
+
+export async function setPageArchived(tenantId: string, pageType: string, userId: string) {
+  return prisma.pageConfig.upsert({
+    where: { tenantId_pageType: { tenantId, pageType } },
+    create: { tenantId, pageType, archivedAt: new Date(), liveAt: null, updatedBy: userId },
+    update: { archivedAt: new Date(), liveAt: null, updatedBy: userId },
+  });
+}
+
+export async function setPageUnarchived(tenantId: string, pageType: string, userId: string) {
+  return prisma.pageConfig.upsert({
+    where: { tenantId_pageType: { tenantId, pageType } },
+    create: { tenantId, pageType, archivedAt: null, updatedBy: userId },
+    update: { archivedAt: null, updatedBy: userId },
+  });
+}
+
 type Tx = Parameters<Parameters<InstanceType<typeof PrismaClient>["$transaction"]>[0]>[0];
 
 // Modelo de versionamento:
@@ -124,6 +164,31 @@ export async function publishBlocks(
     });
 
     return created;
+  });
+}
+
+/**
+ * Deleta uma versão publicada do histórico pelo seu id.
+ * Não permite deletar se for a única versão publicada existente — retorna false.
+ */
+export async function deleteVersion(tenantId: string, pageType: string, versionId: string) {
+  const count = await prisma.pageLayout.count({
+    where: { tenantId, pageType, publishedAt: { not: null } },
+  });
+  if (count <= 1) return false;
+
+  await prisma.pageLayout.deleteMany({
+    where: { id: versionId, tenantId, pageType, publishedAt: { not: null } },
+  });
+  return true;
+}
+
+/**
+ * Limpa o rascunho ativo da página (deleta a linha de draft, se existir).
+ */
+export async function clearDraft(tenantId: string, pageType: string) {
+  await prisma.pageLayout.deleteMany({
+    where: { tenantId, pageType, publishedAt: null },
   });
 }
 

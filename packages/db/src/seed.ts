@@ -109,25 +109,25 @@ async function main() {
 
   const memberships = [
     // Super admin: acesso a ambos os tenants
-    { userId: superAdmin.id, tenantId: "inst_a", role: Role.SUPER_ADMIN },
-    { userId: superAdmin.id, tenantId: "inst_b", role: Role.SUPER_ADMIN },
+    { userId: superAdmin.id, tenantId: "inst_a", role: Role.OWNER },
+    { userId: superAdmin.id, tenantId: "inst_b", role: Role.OWNER },
 
     // Admins
-    { userId: adminA.id, tenantId: "inst_a", role: Role.ADMIN },
-    { userId: adminB.id, tenantId: "inst_b", role: Role.ADMIN },
+    { userId: adminA.id, tenantId: "inst_a", role: Role.ADMINISTRATOR },
+    { userId: adminB.id, tenantId: "inst_b", role: Role.ADMINISTRATOR },
 
     // Professores
     { userId: profA.id, tenantId: "inst_a", role: Role.PROFESSOR },
     { userId: profB.id, tenantId: "inst_b", role: Role.PROFESSOR },
 
     // Alunos na Inst.A
-    { userId: aluno1.id, tenantId: "inst_a", role: Role.ALUNO },
-    { userId: aluno2.id, tenantId: "inst_a", role: Role.ALUNO },
-    { userId: aluno3.id, tenantId: "inst_a", role: Role.ALUNO },
+    { userId: aluno1.id, tenantId: "inst_a", role: Role.STUDENT },
+    { userId: aluno2.id, tenantId: "inst_a", role: Role.STUDENT },
+    { userId: aluno3.id, tenantId: "inst_a", role: Role.STUDENT },
 
     // Usuário cross-tenant: professor no Colégio + aluno na Faculdade
     { userId: crossUser.id, tenantId: "inst_b", role: Role.PROFESSOR },
-    { userId: crossUser.id, tenantId: "inst_a", role: Role.ALUNO },
+    { userId: crossUser.id, tenantId: "inst_a", role: Role.STUDENT },
   ];
 
   for (const m of memberships) {
@@ -211,7 +211,7 @@ async function main() {
   console.log("✅ Seed concluído.");
   console.log("");
   console.log("Credenciais de acesso:");
-  console.log("  superadmin@nexora.edu  /  nexora@superadmin  (SUPER_ADMIN em inst_a + inst_b)");
+  console.log("  superadmin@nexora.edu  /  nexora@superadmin  (OWNER em inst_a + inst_b)");
   console.log("  admin.a@nexora.edu     /  nexora@admin       (ADMIN em inst_a)");
   console.log("  admin.b@nexora.edu     /  nexora@admin       (ADMIN em inst_b)");
   console.log("  prof.a@nexora.edu      /  nexora@prof        (PROFESSOR em inst_a)");

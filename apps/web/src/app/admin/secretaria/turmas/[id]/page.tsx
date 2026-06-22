@@ -31,7 +31,7 @@ export default async function TurmaDetailPage({ params }: { params: Promise<{ id
   const candidates = await prisma.tenantMembership.findMany({
     where: {
       tenantId,
-      role: "ALUNO",
+      role: "STUDENT",
       active: true,
       user: { anonymizedAt: null },
       NOT: {

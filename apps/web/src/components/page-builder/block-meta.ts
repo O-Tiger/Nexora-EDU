@@ -33,7 +33,7 @@ export function makeBlock(type: BlockType): LayoutBlock {
   const id = newId();
   switch (type) {
     case "hero":
-      return { id, type, title: "Bem-vindo", subtitle: "", ctaText: "", ctaHref: "", bgColor: "#1A3A5C" };
+      return { id, type, title: "Bem-vindo", subtitle: "", ctaText: "", ctaHref: "", bgColor: "#1A3A5C", bgGradientDir: "to bottom" as const };
     case "richText":
       return { id, type, html: "<p>Escreva seu texto aqui.</p>" };
     case "featureGrid":
@@ -41,7 +41,7 @@ export function makeBlock(type: BlockType): LayoutBlock {
     case "courseList":
       return { id, type, title: "Nossos cursos", limit: 6 };
     case "cta":
-      return { id, type, title: "Comece agora", text: "", buttonText: "Saiba mais", buttonHref: "", bgColor: "#0D9488" };
+      return { id, type, title: "Comece agora", text: "", buttonText: "Saiba mais", buttonHref: "", bgColor: "#0D9488", bgGradientDir: "to bottom" as const };
     case "image":
       return { id, type, src: "", alt: "" };
     case "carousel":

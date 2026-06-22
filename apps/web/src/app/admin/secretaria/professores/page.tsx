@@ -13,7 +13,7 @@ export default async function ProfessoresPage() {
   const session = await auth();
   if (!session) redirect("/login");
   const { role } = session.user;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "COORDENADOR") redirect("/unauthorized");
+  if (role !== "ADMINISTRATOR" && role !== "OWNER" && role !== "ASSISTANT") redirect("/unauthorized");
 
   const professores = await getProfessoresComVinculos(session.user.activeTenantId);
 

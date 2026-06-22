@@ -14,7 +14,7 @@ async function requireStaff() {
   const session = await auth();
   if (!session) return null;
   const { role } = session.user;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "COORDENADOR" && role !== "PROFESSOR") return null;
+  if (role !== "ADMINISTRATOR" && role !== "OWNER" && role !== "ASSISTANT" && role !== "PROFESSOR") return null;
   return session;
 }
 

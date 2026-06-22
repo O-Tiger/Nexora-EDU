@@ -8,7 +8,7 @@ import { createGuardianAction } from "@/actions/secretaria";
 const RELATIONSHIP_OPTIONS = [
   { value: "PAI", label: "Pai" },
   { value: "MAE", label: "Mãe" },
-  { value: "RESPONSAVEL", label: "Responsável" },
+  { value: "RESPONSIBLE", label: "Responsável" },
   { value: "OUTRO", label: "Outro" },
 ];
 

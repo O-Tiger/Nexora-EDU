@@ -11,7 +11,7 @@ export default async function DominiosPage() {
   const session = await auth();
   if (!session) redirect("/login");
   const { role, activeTenantId } = session.user;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") redirect("/unauthorized");
+  if (role !== "ADMINISTRATOR" && role !== "OWNER") redirect("/unauthorized");
 
   const domains = await getDomainsByTenant(activeTenantId);
 

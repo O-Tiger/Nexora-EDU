@@ -5,6 +5,7 @@ import { Badge } from "@nexora/ui";
 import { Mail, Phone, Trash2 } from "lucide-react";
 import { deleteGuardianAction } from "@/actions/secretaria";
 import { useConfirm } from "@/hooks/use-confirm";
+import { ResponsavelAccessButton } from "./responsavel-access-button";
 
 interface Props {
   id: string;
@@ -14,9 +15,10 @@ interface Props {
   email?: string | null;
   phone?: string | null;
   isPrimary: boolean;
+  userId?: string | null;
 }
 
-export function GuardianRow({ id, studentId, name, relationship, email, phone, isPrimary }: Props) {
+export function GuardianRow({ id, studentId, name, relationship, email, phone, isPrimary, userId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [ConfirmDialog, confirm] = useConfirm();
 
@@ -49,14 +51,17 @@ export function GuardianRow({ id, studentId, name, relationship, email, phone, i
             )}
           </div>
         </div>
-        <button
-          onClick={handleDelete}
-          disabled={isPending}
-          className="p-1 text-navy-300 hover:text-red-500 disabled:opacity-50"
-          aria-label="Remover responsável"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <ResponsavelAccessButton guardianId={id} hasAccess={!!userId} email={email} />
+          <button
+            onClick={handleDelete}
+            disabled={isPending}
+            className="p-1 text-navy-300 hover:text-red-500 disabled:opacity-50"
+            aria-label="Remover responsável"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </>
   );

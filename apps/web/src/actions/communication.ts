@@ -40,7 +40,7 @@ async function requireStaff() {
   const session = await auth();
   if (!session) redirect("/login");
   const { role, activeTenantId, id } = session.user;
-  if (!["ADMIN", "SUPER_ADMIN", "COORDENADOR", "PROFESSOR"].includes(role)) redirect("/unauthorized");
+  if (!["ADMINISTRATOR", "OWNER", "ASSISTANT", "PROFESSOR"].includes(role)) redirect("/unauthorized");
   return { tenantId: activeTenantId, userId: id, role };
 }
 
@@ -48,7 +48,7 @@ async function requireAdmin() {
   const session = await auth();
   if (!session) redirect("/login");
   const { role, activeTenantId, id } = session.user;
-  if (!["ADMIN", "SUPER_ADMIN", "COORDENADOR"].includes(role)) redirect("/unauthorized");
+  if (!["ADMINISTRATOR", "OWNER", "ASSISTANT"].includes(role)) redirect("/unauthorized");
   return { tenantId: activeTenantId, userId: id, role };
 }
 
@@ -118,7 +118,7 @@ export async function createThreadAction(data: unknown) {
   if (!mod) return { error: "Módulo não encontrado" };
 
   const { role } = await requireSession();
-  const isStaff = ["ADMIN", "SUPER_ADMIN", "COORDENADOR", "PROFESSOR"].includes(role);
+  const isStaff = ["ADMINISTRATOR", "OWNER", "ASSISTANT", "PROFESSOR"].includes(role);
   const hasAccess = isStaff || mod.course.enrollments.length > 0;
   if (!hasAccess) return { error: "Sem acesso a este módulo" };
 
@@ -170,7 +170,7 @@ export async function deleteThreadAction(id: string) {
   if (!thread) return { error: "Tópico não encontrado" };
   // Dono do tópico ou staff pode deletar
   const { role } = await requireSession();
-  const isStaff = ["ADMIN", "SUPER_ADMIN", "COORDENADOR", "PROFESSOR"].includes(role);
+  const isStaff = ["ADMINISTRATOR", "OWNER", "ASSISTANT", "PROFESSOR"].includes(role);
   if (thread.authorId !== userId && !isStaff) return { error: "Sem permissão" };
 
   await deleteThread(tenantId, id);
@@ -185,7 +185,7 @@ export async function deleteReplyAction(id: string) {
   });
   if (!reply) return { error: "Resposta não encontrada" };
   const { role } = await requireSession();
-  const isStaff = ["ADMIN", "SUPER_ADMIN", "COORDENADOR", "PROFESSOR"].includes(role);
+  const isStaff = ["ADMINISTRATOR", "OWNER", "ASSISTANT", "PROFESSOR"].includes(role);
   if (reply.authorId !== userId && !isStaff) return { error: "Sem permissão" };
 
   await deleteReply(tenantId, id);

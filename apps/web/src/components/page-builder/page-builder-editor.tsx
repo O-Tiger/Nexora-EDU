@@ -30,12 +30,12 @@ import {
   SelectItem,
   toast,
 } from "@nexora/ui";
-import { GripVertical, Trash2, Plus, Eye, Pencil, Save, Rocket, History } from "lucide-react";
+import { GripVertical, Trash2, Plus, Eye, Pencil, Save, Rocket, History, Eraser, EyeOff, Archive, ArchiveRestore, Globe } from "lucide-react";
 import type { LayoutBlock, BlockType } from "@nexora/validators";
-import { FEATURE_ICONS } from "@nexora/validators";
+import { FEATURE_ICONS, BG_GRADIENT_DIRS } from "@nexora/validators";
 import { BLOCK_LABELS, BLOCK_PALETTE, makeBlock } from "./block-meta";
 import { BlockView } from "./block-view";
-import { saveDraftAction, publishLayoutAction, rollbackLayoutAction } from "@/actions/layouts";
+import { saveDraftAction, publishLayoutAction, rollbackLayoutAction, deleteVersionAction, clearPageAction, unpublishPageAction, archivePageAction, unarchivePageAction } from "@/actions/layouts";
 import { useConfirm } from "@/hooks/use-confirm";
 
 interface VersionRow {
@@ -51,10 +51,15 @@ interface Props {
   initialBlocks: LayoutBlock[];
   source: "draft" | "published" | "empty";
   versions: VersionRow[];
+  isLive: boolean;
+  isArchived: boolean;
 }
 
-export function PageBuilderEditor({ pageType, initialBlocks, source, versions }: Props) {
+export function PageBuilderEditor({ pageType, initialBlocks, source, versions, isLive: initialIsLive, isArchived: initialIsArchived }: Props) {
   const [blocks, setBlocks] = useState<LayoutBlock[]>(initialBlocks);
+  const [localVersions, setLocalVersions] = useState<VersionRow[]>(versions);
+  const [live, setLive] = useState(initialIsLive);
+  const [archived, setArchived] = useState(initialIsArchived);
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [dirty, setDirty] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -127,6 +132,63 @@ export function PageBuilderEditor({ pageType, initialBlocks, source, versions }:
     });
   }
 
+  async function handleDeleteVersion(versionId: string, version: number) {
+    if (!await confirm({ title: "Deletar versão", description: `Deletar v${version} do histórico? Esta ação não pode ser desfeita.`, confirmLabel: "Deletar", confirmVariant: "destructive" })) return;
+    startTransition(async () => {
+      const r = await deleteVersionAction(pageType, versionId);
+      if (r?.error) {
+        toast({ variant: "destructive", title: "Erro", description: r.error });
+        return;
+      }
+      setLocalVersions((prev) => prev.filter((v) => v.id !== versionId));
+      toast({ title: `Versão ${version} deletada` });
+    });
+  }
+
+  async function handleClearPage() {
+    if (!await confirm({ title: "Limpar página", description: "Remover todos os blocos e salvar rascunho vazio? O histórico de versões publicadas não será afetado.", confirmLabel: "Limpar", confirmVariant: "destructive" })) return;
+    startTransition(async () => {
+      const r = await clearPageAction(pageType);
+      if (r?.error) {
+        toast({ variant: "destructive", title: "Erro", description: r.error });
+        return;
+      }
+      setBlocks([]);
+      setDirty(false);
+      toast({ title: "Página limpa" });
+    });
+  }
+
+  async function handleUnpublish() {
+    if (!await confirm({ title: "Despublicar página", description: "A página sairá do ar imediatamente. O conteúdo e o histórico de versões são preservados.", confirmLabel: "Despublicar", confirmVariant: "destructive" })) return;
+    startTransition(async () => {
+      const r = await unpublishPageAction(pageType);
+      if (r?.error) { toast({ variant: "destructive", title: "Erro", description: r.error }); return; }
+      setLive(false);
+      toast({ title: "Página despublicada" });
+    });
+  }
+
+  async function handleArchive() {
+    if (!await confirm({ title: "Arquivar página", description: "A página ficará fora do ar e o editor ficará somente leitura. Para reativar, use Desarquivar.", confirmLabel: "Arquivar", confirmVariant: "destructive" })) return;
+    startTransition(async () => {
+      const r = await archivePageAction(pageType);
+      if (r?.error) { toast({ variant: "destructive", title: "Erro", description: r.error }); return; }
+      setArchived(true);
+      setLive(false);
+      toast({ title: "Página arquivada" });
+    });
+  }
+
+  async function handleUnarchive() {
+    startTransition(async () => {
+      const r = await unarchivePageAction(pageType);
+      if (r?.error) { toast({ variant: "destructive", title: "Erro", description: r.error }); return; }
+      setArchived(false);
+      toast({ title: "Página desarquivada — despublicada por padrão. Publique para colocar no ar." });
+    });
+  }
+
   return (
     <div className="space-y-4">
       <ConfirmDialog />
@@ -135,7 +197,8 @@ export function PageBuilderEditor({ pageType, initialBlocks, source, versions }:
         <div className="flex rounded-md border border-navy-100 p-0.5">
           <button
             onClick={() => setMode("edit")}
-            className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium ${mode === "edit" ? "bg-navy-100 text-navy-900" : "text-navy-500"}`}
+            disabled={archived}
+            className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium ${mode === "edit" ? "bg-navy-100 text-navy-900" : "text-navy-500"} disabled:opacity-40`}
           >
             <Pencil className="h-3.5 w-3.5" /> Editar
           </button>
@@ -147,19 +210,60 @@ export function PageBuilderEditor({ pageType, initialBlocks, source, versions }:
           </button>
         </div>
 
+        {/* Status badge */}
+        {archived ? (
+          <span className="flex items-center gap-1 rounded-full bg-navy-100 px-2.5 py-0.5 text-xs font-medium text-navy-500">
+            <Archive className="h-3 w-3" /> Arquivada
+          </span>
+        ) : live ? (
+          <span className="flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+            <Globe className="h-3 w-3" /> Ao vivo
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+            <EyeOff className="h-3 w-3" /> Despublicada
+          </span>
+        )}
+
         <span className="text-xs text-navy-400">
           {dirty ? "Alterações não salvas" : source === "empty" ? "Página vazia" : `Editando ${source === "draft" ? "rascunho" : "última publicada"}`}
         </span>
 
-        <div className="ml-auto flex gap-2">
-          <Button variant="secondary" size="sm" onClick={saveDraft} disabled={isPending}>
-            <Save className="h-4 w-4" /> Salvar rascunho
-          </Button>
-          <Button size="sm" onClick={publish} disabled={isPending || blocks.length === 0}>
-            <Rocket className="h-4 w-4" /> Publicar
-          </Button>
+        <div className="ml-auto flex flex-wrap gap-2">
+          {archived ? (
+            <Button variant="secondary" size="sm" onClick={handleUnarchive} disabled={isPending}>
+              <ArchiveRestore className="h-4 w-4" /> Desarquivar
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={handleClearPage} disabled={isPending} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                <Eraser className="h-4 w-4" /> Limpar
+              </Button>
+              {live && (
+                <Button variant="ghost" size="sm" onClick={handleUnpublish} disabled={isPending} className="text-amber-600 hover:text-amber-800 hover:bg-amber-50">
+                  <EyeOff className="h-4 w-4" /> Despublicar
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={handleArchive} disabled={isPending} className="text-navy-400 hover:text-navy-700 hover:bg-navy-50">
+                <Archive className="h-4 w-4" /> Arquivar
+              </Button>
+              <Button variant="secondary" size="sm" onClick={saveDraft} disabled={isPending}>
+                <Save className="h-4 w-4" /> Salvar rascunho
+              </Button>
+              <Button size="sm" onClick={publish} disabled={isPending || blocks.length === 0}>
+                <Rocket className="h-4 w-4" /> Publicar
+              </Button>
+            </>
+          )}
         </div>
       </div>
+
+      {archived && (
+        <div className="flex items-center gap-2 rounded-lg border border-navy-200 bg-navy-50 px-4 py-3 text-sm text-navy-500">
+          <Archive className="h-4 w-4 shrink-0" />
+          Esta página está arquivada. Desarquive para retomar a edição.
+        </div>
+      )}
 
       {mode === "preview" ? (
         <div className="overflow-hidden rounded-lg border border-navy-100 bg-white">
@@ -216,11 +320,11 @@ export function PageBuilderEditor({ pageType, initialBlocks, source, versions }:
               <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase text-navy-400">
                 <History className="h-3.5 w-3.5" /> Versões publicadas
               </p>
-              {versions.length === 0 ? (
+              {localVersions.length === 0 ? (
                 <p className="text-xs text-navy-400">Nenhuma versão publicada ainda.</p>
               ) : (
                 <ul className="space-y-1">
-                  {versions.map((v) => (
+                  {localVersions.map((v) => (
                     <li key={v.id} className="flex items-center justify-between gap-2 rounded-md bg-navy-50 px-2.5 py-1.5 text-xs">
                       <span className="text-navy-700">
                         v{v.version}
@@ -228,13 +332,24 @@ export function PageBuilderEditor({ pageType, initialBlocks, source, versions }:
                           {v.publishedAt ? new Date(v.publishedAt).toLocaleDateString("pt-BR") : ""}
                         </span>
                       </span>
-                      <button
-                        onClick={() => rollback(v.version)}
-                        disabled={isPending}
-                        className="text-teal-600 hover:text-teal-800 disabled:opacity-50"
-                      >
-                        Restaurar
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => rollback(v.version)}
+                          disabled={isPending}
+                          className="text-teal-600 hover:text-teal-800 disabled:opacity-50"
+                        >
+                          Restaurar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteVersion(v.id, v.version)}
+                          disabled={isPending || localVersions.length <= 1}
+                          className="text-navy-300 hover:text-red-500 disabled:opacity-30 transition-colors"
+                          aria-label={`Deletar versão ${v.version}`}
+                          title={localVersions.length <= 1 ? "Não é possível deletar a única versão" : `Deletar v${v.version}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -293,6 +408,77 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+const DIR_LABELS: Record<string, string> = {
+  "to bottom": "Cima → Baixo",
+  "to right": "Esquerda → Direita",
+  "to bottom right": "Diagonal ↘",
+  "to bottom left": "Diagonal ↙",
+};
+
+function GradientFields({
+  bgColor, bgGradientTo, bgGradientDir, onPatch,
+}: {
+  bgColor: string;
+  bgGradientTo: string | undefined;
+  bgGradientDir: string | undefined;
+  onPatch: (p: Record<string, unknown>) => void;
+}) {
+  const hasGradient = !!bgGradientTo;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-navy-500">{hasGradient ? "Cor inicial" : "Cor de fundo"}</Label>
+          <input type="color" value={bgColor} onChange={(e) => onPatch({ bgColor: e.target.value })} className="h-9 w-16 cursor-pointer rounded border border-navy-200" />
+        </div>
+
+        {hasGradient ? (
+          <div className="space-y-1">
+            <Label className="text-xs text-navy-500">Cor final</Label>
+            <div className="flex items-center gap-1">
+              <input type="color" value={bgGradientTo} onChange={(e) => onPatch({ bgGradientTo: e.target.value })} className="h-9 w-16 cursor-pointer rounded border border-navy-200" />
+              <button onClick={() => onPatch({ bgGradientTo: undefined })} className="text-xs text-navy-400 hover:text-red-500 px-1" title="Remover gradiente">×</button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1 mt-4">
+            <button
+              onClick={() => onPatch({ bgGradientTo: "#000000" })}
+              className="text-xs text-teal-600 hover:text-teal-800 border border-dashed border-teal-300 rounded px-2 py-1"
+            >
+              + Gradiente
+            </button>
+          </div>
+        )}
+
+        {hasGradient && (
+          <div className="space-y-1 flex-1">
+            <Label className="text-xs text-navy-500">Direção</Label>
+            <select
+              value={bgGradientDir ?? "to bottom"}
+              onChange={(e) => onPatch({ bgGradientDir: e.target.value })}
+              className="w-full rounded-md border border-navy-200 px-2 py-2 text-xs"
+            >
+              {BG_GRADIENT_DIRS.map((d) => (
+                <option key={d} value={d}>{DIR_LABELS[d]}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
+      {hasGradient && (
+        <div
+          className="h-6 w-full rounded-md border border-navy-100"
+          style={{ backgroundImage: `linear-gradient(${bgGradientDir ?? "to bottom"}, ${bgColor}, ${bgGradientTo})` }}
+          aria-hidden
+        />
+      )}
+    </div>
+  );
+}
+
 function BlockForm({ block, onPatch }: { block: LayoutBlock; onPatch: (p: Record<string, unknown>) => void }) {
   switch (block.type) {
     case "hero":
@@ -304,7 +490,12 @@ function BlockForm({ block, onPatch }: { block: LayoutBlock; onPatch: (p: Record
             <Field label="Texto do botão"><Input value={block.ctaText} maxLength={60} onChange={(e) => onPatch({ ctaText: e.target.value })} /></Field>
             <Field label="Link do botão"><Input value={block.ctaHref} placeholder="/login" onChange={(e) => onPatch({ ctaHref: e.target.value })} /></Field>
           </div>
-          <Field label="Cor de fundo"><input type="color" value={block.bgColor} onChange={(e) => onPatch({ bgColor: e.target.value })} className="h-9 w-16 rounded border border-navy-200" /></Field>
+          <GradientFields
+            bgColor={block.bgColor}
+            bgGradientTo={block.bgGradientTo}
+            bgGradientDir={block.bgGradientDir}
+            onPatch={onPatch}
+          />
         </>
       );
 
@@ -385,7 +576,12 @@ function BlockForm({ block, onPatch }: { block: LayoutBlock; onPatch: (p: Record
             <Field label="Texto do botão"><Input value={block.buttonText} maxLength={60} onChange={(e) => onPatch({ buttonText: e.target.value })} /></Field>
             <Field label="Link do botão"><Input value={block.buttonHref} placeholder="/login" onChange={(e) => onPatch({ buttonHref: e.target.value })} /></Field>
           </div>
-          <Field label="Cor de fundo"><input type="color" value={block.bgColor} onChange={(e) => onPatch({ bgColor: e.target.value })} className="h-9 w-16 rounded border border-navy-200" /></Field>
+          <GradientFields
+            bgColor={block.bgColor}
+            bgGradientTo={block.bgGradientTo}
+            bgGradientDir={block.bgGradientDir}
+            onPatch={onPatch}
+          />
         </>
       );
 

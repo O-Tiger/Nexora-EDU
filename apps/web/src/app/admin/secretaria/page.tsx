@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { School, Building2, BookOpen, Users, ChevronRight, BookMarked, FileText } from "lucide-react";
+import { School, Building2, BookOpen, Users, ChevronRight, BookMarked, FileText, DollarSign, BookmarkCheck } from "lucide-react";
 import { Button } from "@nexora/ui";
 import { getAnosLetivos, getAnoLetivoAtivo, getUnidades, getSecretariaOverview } from "@nexora/db/src/queries/secretaria";
 import { AnoLetivoForm } from "@/components/secretaria/ano-letivo-form";
@@ -47,6 +47,16 @@ export default async function SecretariaPage() {
         <Button variant="outline" size="sm" asChild>
           <Link href={"/admin/secretaria/boletins" as never} className="gap-2">
             <FileText className="h-4 w-4" /> Boletins
+          </Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={"/admin/secretaria/financeiro" as never} className="gap-2">
+            <DollarSign className="h-4 w-4" /> Financeiro
+          </Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={"/admin/secretaria/reservas" as never} className="gap-2">
+            <BookmarkCheck className="h-4 w-4" /> Reservas de Vaga
           </Link>
         </Button>
       </div>

@@ -12,7 +12,7 @@ export default async function CertificadosPage() {
   const session = await auth();
   if (!session) redirect("/login");
   const { role, activeTenantId } = session.user;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "COORDENADOR") redirect("/unauthorized");
+  if (role !== "ADMINISTRATOR" && role !== "OWNER" && role !== "ASSISTANT") redirect("/unauthorized");
 
   const fallback = activeTenantId === "inst_a" ? "Faculdade Nexora" : "Colégio Nexora";
   const [tpl, issuedCount] = await Promise.all([

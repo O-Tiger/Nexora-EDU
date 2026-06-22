@@ -65,6 +65,8 @@ export default async function PageEditorPage({
         initialBlocks={blocks}
         source={data.editor.source}
         versions={data.versions}
+        isLive={data.isLive}
+        isArchived={data.isArchived}
       />
     </div>
   );

@@ -17,7 +17,7 @@ export default async function AdminDashboardPage() {
     prisma.course.count({ where: { tenantId } }),
     prisma.enrollment.count({ where: { tenantId } }),
     prisma.enrollment.count({ where: { tenantId, status: "ACTIVE" } }),
-    prisma.tenantMembership.count({ where: { tenantId, role: "ALUNO", active: true } }),
+    prisma.tenantMembership.count({ where: { tenantId, role: "STUDENT", active: true } }),
   ]);
 
   const stats = [

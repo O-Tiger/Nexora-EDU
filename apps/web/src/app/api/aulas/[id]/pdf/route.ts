@@ -32,7 +32,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   // Verificar matrícula ativa — admin/professor pode acessar sem matrícula
   const { role } = session.user;
-  const isStaff = role === "ADMIN" || role === "SUPER_ADMIN" || role === "COORDENADOR" || role === "PROFESSOR";
+  const isStaff = role === "ADMINISTRATOR" || role === "OWNER" || role === "ASSISTANT" || role === "PROFESSOR";
   const hasEnrollment = lesson.module.course.enrollments.length > 0;
 
   if (!isStaff && !hasEnrollment) {

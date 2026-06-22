@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { auth } from "@nexora/auth";
 import { redirect, notFound } from "next/navigation";
-import { getPublishedBlocks } from "@nexora/db/src/queries/layouts";
+import { getPublishedBlocks, getPageConfig } from "@nexora/db/src/queries/layouts";
 import { getTenantByDomain } from "@nexora/db/src/queries/domains";
 import { PageBlocksSchema, PAGE_TYPES, type PageType } from "@nexora/validators";
 import { PageRenderer } from "@/components/page-builder/page-renderer";
@@ -31,7 +31,13 @@ export default async function PublicPage({
     tenantId = session.user.activeTenantId;
   }
 
-  const raw = await getPublishedBlocks(tenantId, pt);
+  const [raw, config] = await Promise.all([
+    getPublishedBlocks(tenantId, pt),
+    getPageConfig(tenantId, pt),
+  ]);
+
+  if (config?.archivedAt || !config?.liveAt) notFound();
+
   const parsed = PageBlocksSchema.safeParse(raw ?? []);
   const blocks = parsed.success ? parsed.data : [];
 

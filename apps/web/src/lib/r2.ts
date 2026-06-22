@@ -81,7 +81,7 @@ export function resolveVideoId(videoRef: string): string {
  */
 export function buildFileKey(
   tenantId: string,
-  category: "pdfs" | "imagens" | "certificados" | "imports",
+  category: "pdfs" | "imagens" | "certificados" | "imports" | "logos",
   fileName: string,
 ): string {
   const ext = fileName.split(".").pop() ?? "bin";

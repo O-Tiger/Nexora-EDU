@@ -1,3 +1,4 @@
+import React from "react";
 import Link from "next/link";
 import type { LayoutBlock, FeatureIcon } from "@nexora/validators";
 import { sanitizeHtml } from "@/lib/sanitize";
@@ -18,6 +19,13 @@ const FEATURE_ICON_MAP: Record<FeatureIcon, LucideIcon> = {
 // Componente PURO (sem APIs server-only nem async) — usado tanto pelo
 // PageRenderer (server) quanto pelo preview do editor (client).
 
+function bgStyle(bgColor: string, bgGradientTo?: string, bgGradientDir = "to bottom"): React.CSSProperties {
+  if (bgGradientTo) {
+    return { backgroundImage: `linear-gradient(${bgGradientDir}, ${bgColor}, ${bgGradientTo})` };
+  }
+  return { backgroundColor: bgColor };
+}
+
 const SPACER_H: Record<string, string> = {
   sm: "h-6",
   md: "h-12",
@@ -31,7 +39,7 @@ export function BlockView({ block, courses }: { block: LayoutBlock; courses: Cou
   switch (block.type) {
     case "hero":
       return (
-        <section className="px-6 py-20 text-center text-white" style={{ backgroundColor: block.bgColor }}>
+        <section className="px-6 py-20 text-center text-white" style={bgStyle(block.bgColor, block.bgGradientTo, block.bgGradientDir)}>
           <div className="mx-auto max-w-3xl">
             <h1 className="text-3xl font-bold sm:text-4xl lg:text-5xl">{block.title}</h1>
             {block.subtitle && (
@@ -119,7 +127,7 @@ export function BlockView({ block, courses }: { block: LayoutBlock; courses: Cou
 
     case "cta":
       return (
-        <section className="px-6 py-16 text-center text-white" style={{ backgroundColor: block.bgColor }}>
+        <section className="px-6 py-16 text-center text-white" style={bgStyle(block.bgColor, block.bgGradientTo, block.bgGradientDir)}>
           <div className="mx-auto max-w-2xl">
             <h2 className="text-2xl font-bold sm:text-3xl">{block.title}</h2>
             {block.text && <p className="mt-3 opacity-90">{block.text}</p>}

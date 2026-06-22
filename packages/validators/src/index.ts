@@ -5,3 +5,5 @@ export * from "./assessment";
 export * from "./communication";
 export * from "./live-session";
 export * from "./secretaria";
+export * from "./financeiro";
+export * from "./reservas";

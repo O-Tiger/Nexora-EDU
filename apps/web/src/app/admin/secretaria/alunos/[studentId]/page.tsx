@@ -23,7 +23,7 @@ export default async function StudentFilePage({ params }: { params: Promise<{ st
 
   // Verify student belongs to this tenant
   const membership = await prisma.tenantMembership.findFirst({
-    where: { userId: studentId, tenantId, role: "ALUNO", active: true },
+    where: { userId: studentId, tenantId, role: "STUDENT", active: true },
     include: { user: { select: { id: true, name: true, email: true, phone: true, cpf: true, createdAt: true } } },
   });
   if (!membership) notFound();
@@ -90,6 +90,7 @@ export default async function StudentFilePage({ params }: { params: Promise<{ st
                 email={g.email}
                 phone={g.phone}
                 isPrimary={g.isPrimary}
+                userId={g.userId}
               />
             ))}
           </div>

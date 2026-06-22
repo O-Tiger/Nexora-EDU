@@ -27,7 +27,7 @@ async function requireAdmin() {
   const session = await auth();
   if (!session) redirect("/login");
   const { role, activeTenantId } = session.user;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "COORDENADOR") {
+  if (role !== "ADMINISTRATOR" && role !== "OWNER" && role !== "ASSISTANT") {
     redirect("/unauthorized");
   }
   return { tenantId: activeTenantId, userId: session.user.id };
