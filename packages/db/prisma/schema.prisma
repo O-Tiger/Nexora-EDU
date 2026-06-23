@@ -42,6 +42,7 @@ model User {
   turmaEnrollments TurmaEnrollment[] @relation("StudentTurmaEnrollments")
   mensalidades     Mensalidade[]    @relation("StudentMensalidades")
   reservas         ReservaVaga[]    @relation("StudentReservas")
+  linkedProfessor  Professor?       @relation("ProfessorUser")
 
   @@index([email])
 }
@@ -877,6 +878,7 @@ model Professor {
   userId    String?  @unique
   createdAt DateTime @default(now())
 
+  linkedUser       User?            @relation("ProfessorUser", fields: [userId], references: [id], onDelete: SetNull)
   turmaDisciplinas TurmaDisciplina[]
 
   @@index([tenantId, active])

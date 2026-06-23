@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, UserCog } from "lucide-react";
 import { Button } from "@nexora/ui";
-import { getProfessoresComVinculos } from "@nexora/db/src/queries/professores";
+import { getProfessoresComVinculos, getUsersWithProfessorRole } from "@nexora/db/src/queries/professores";
 import { ProfessoresManager } from "@/components/secretaria/professores-manager";
 
 export const metadata: Metadata = { title: "Professores" };
@@ -15,7 +15,10 @@ export default async function ProfessoresPage() {
   const { role } = session.user;
   if (role !== "ADMINISTRATOR" && role !== "OWNER" && role !== "ASSISTANT") redirect("/unauthorized");
 
-  const professores = await getProfessoresComVinculos(session.user.activeTenantId);
+  const [professores, users] = await Promise.all([
+    getProfessoresComVinculos(session.user.activeTenantId),
+    getUsersWithProfessorRole(session.user.activeTenantId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -28,11 +31,11 @@ export default async function ProfessoresPage() {
             <UserCog className="h-6 w-6 text-teal-500" />
             Professores
           </h1>
-          <p className="text-sm text-navy-500">{professores.length} professor{professores.length !== 1 ? "es" : ""} · cadastro interno (sem login)</p>
+          <p className="text-sm text-navy-500">{professores.length} professor{professores.length !== 1 ? "es" : ""} · {users.length} usuário{users.length !== 1 ? "s" : ""} com papel Professor</p>
         </div>
       </div>
 
-      <ProfessoresManager initial={professores} />
+      <ProfessoresManager initial={professores} users={users} />
     </div>
   );
 }

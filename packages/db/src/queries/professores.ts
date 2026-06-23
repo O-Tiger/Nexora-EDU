@@ -10,11 +10,12 @@ export async function getProfessoresDisponiveis(tenantId: string) {
   });
 }
 
-/** Professores do tenant com seus vínculos (turma + disciplina). */
+/** Professores do tenant com seus vínculos (turma + disciplina) e usuário vinculado. */
 export async function getProfessoresComVinculos(tenantId: string) {
   const professores = await prisma.professor.findMany({
     where: { tenantId, active: true },
     orderBy: { name: "asc" },
+    include: { linkedUser: { select: { id: true, name: true, email: true } } },
   });
 
   const ids = professores.map((p) => p.id);
@@ -31,6 +32,7 @@ export async function getProfessoresComVinculos(tenantId: string) {
     name: p.name,
     email: p.email,
     phone: p.phone,
+    linkedUser: p.linkedUser ? { id: p.linkedUser.id, name: p.linkedUser.name, email: p.linkedUser.email } : null,
     vinculos: vinculos
       .filter((v) => v.professorId === p.id)
       .map((v) => ({ turmaCode: v.turma.code, disciplinaName: v.disciplina.name })),
@@ -135,4 +137,22 @@ export async function deleteProfessor(id: string, tenantId: string) {
     prisma.turmaDisciplina.updateMany({ where: { tenantId, professorId: id }, data: { professorId: null } }),
     prisma.professor.updateMany({ where: { id, tenantId }, data: { active: false } }),
   ]);
+}
+
+/** Users com role PROFESSOR neste tenant (candidatos para vincular ao cadastro interno). */
+export async function getUsersWithProfessorRole(tenantId: string) {
+  const memberships = await prisma.tenantMembership.findMany({
+    where: { tenantId, role: "PROFESSOR", active: true },
+    include: { user: { select: { id: true, name: true, email: true } } },
+    orderBy: { user: { name: "asc" } },
+  });
+  return memberships.map((m) => ({ id: m.user.id, name: m.user.name, email: m.user.email }));
+}
+
+export async function linkUserToProfessor(professorId: string, userId: string, tenantId: string) {
+  return prisma.professor.updateMany({ where: { id: professorId, tenantId }, data: { userId } });
+}
+
+export async function unlinkUserFromProfessor(professorId: string, tenantId: string) {
+  return prisma.professor.updateMany({ where: { id: professorId, tenantId }, data: { userId: null } });
 }

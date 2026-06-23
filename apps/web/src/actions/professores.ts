@@ -7,6 +7,8 @@ import { z } from "zod";
 import {
   createProfessor,
   deleteProfessor,
+  linkUserToProfessor,
+  unlinkUserFromProfessor,
 } from "@nexora/db/src/queries/professores";
 
 /** Apenas papéis com acesso interno podem cadastrar/excluir professores. */
@@ -48,6 +50,20 @@ export async function createProfessorAction(formData: FormData) {
 export async function deleteProfessorAction(id: string) {
   const { tenantId } = await requireInternal();
   await deleteProfessor(id, tenantId);
+  revalidatePath("/admin/secretaria/professores");
+  return { success: true };
+}
+
+export async function linkProfessorUserAction(professorId: string, userId: string) {
+  const { tenantId } = await requireInternal();
+  await linkUserToProfessor(professorId, userId, tenantId);
+  revalidatePath("/admin/secretaria/professores");
+  return { success: true };
+}
+
+export async function unlinkProfessorUserAction(professorId: string) {
+  const { tenantId } = await requireInternal();
+  await unlinkUserFromProfessor(professorId, tenantId);
   revalidatePath("/admin/secretaria/professores");
   return { success: true };
 }
