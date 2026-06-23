@@ -8,6 +8,7 @@ import { useConfirm } from "@/hooks/use-confirm";
 
 interface Student { enrollmentId: string; name: string }
 interface Disciplina { id: string; name: string }
+interface HorarioSlot { disciplinaId: string; diaSemana: number; frequencia: string }
 interface Registro {
   id: string;
   disciplinaId: string;
@@ -25,6 +26,46 @@ interface Props {
   students: Student[];
   disciplinas: Disciplina[];
   registros: Registro[];
+  horarioSlots?: HorarioSlot[];
+}
+
+/** ISO week number (1-based). */
+function isoWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+function weekFrequencia(dateStr: string): "QUINZENAL_PAR" | "QUINZENAL_IMPAR" {
+  const d = new Date(dateStr + "T12:00:00");
+  return isoWeek(d) % 2 === 0 ? "QUINZENAL_PAR" : "QUINZENAL_IMPAR";
+}
+
+function filterDisciplinas(
+  all: Disciplina[],
+  slots: HorarioSlot[],
+  dateStr: string,
+): { visible: Disciplina[]; parityLabel: string | null } {
+  if (slots.length === 0) return { visible: all, parityLabel: null };
+  const date = new Date(dateStr + "T12:00:00");
+  // JS: 0=Sun → map to 1=Mon..6=Sat (ignore Sun=0)
+  const jsDay = date.getDay();
+  const diaSemana = jsDay === 0 ? 7 : jsDay;
+  const slotsForDay = slots.filter((s) => s.diaSemana === diaSemana);
+  if (slotsForDay.length === 0) return { visible: all, parityLabel: null };
+  const freq = weekFrequencia(dateStr);
+  const validIds = new Set(
+    slotsForDay
+      .filter((s) => s.frequencia === "SEMANAL" || s.frequencia === freq)
+      .map((s) => s.disciplinaId),
+  );
+  const visible = all.filter((d) => validIds.has(d.id));
+  const hasQuinzenal = slotsForDay.some((s) => s.frequencia !== "SEMANAL");
+  const parityLabel = hasQuinzenal
+    ? freq === "QUINZENAL_PAR" ? "Semana par (semana " + isoWeek(date) + ")" : "Semana ímpar (semana " + isoWeek(date) + ")"
+    : null;
+  return { visible: visible.length > 0 ? visible : all, parityLabel };
 }
 
 function todayISO() {
@@ -39,10 +80,11 @@ function statusLabel(p: Presenca, n: number): { text: string; cls: string } {
   return { text: "Parcial", cls: "text-amber-600" };
 }
 
-export function DiarioManager({ turmaId, students, disciplinas, registros }: Props) {
+export function DiarioManager({ turmaId, students, disciplinas, registros, horarioSlots = [] }: Props) {
   const [open, setOpen] = useState(false);
-  const [disciplinaId, setDisciplinaId] = useState(disciplinas[0]?.id ?? "");
   const [data, setData] = useState(todayISO());
+  const { visible: discsFiltradas, parityLabel } = filterDisciplinas(disciplinas, horarioSlots, data);
+  const [disciplinaId, setDisciplinaId] = useState(disciplinas[0]?.id ?? "");
   const [quantidadeAulas, setQuantidadeAulas] = useState(1);
   const [conteudo, setConteudo] = useState("");
   const [observacoes, setObservacoes] = useState("");
@@ -66,9 +108,20 @@ export function DiarioManager({ turmaId, students, disciplinas, registros }: Pro
     setPresencas(new Map(students.map((s) => [s.enrollmentId, { faltas: 0, justificadas: 0 }])));
   }
 
+  function handleDataChange(newDate: string) {
+    setData(newDate);
+    const { visible } = filterDisciplinas(disciplinas, horarioSlots, newDate);
+    if (!visible.some((d) => d.id === disciplinaId)) {
+      setDisciplinaId(visible[0]?.id ?? disciplinas[0]?.id ?? "");
+    }
+  }
+
   function reset() {
-    setConteudo(""); setObservacoes(""); setQuantidadeAulas(1); setData(todayISO());
+    const today = todayISO();
+    setConteudo(""); setObservacoes(""); setQuantidadeAulas(1); setData(today);
     resetPresencas();
+    const { visible } = filterDisciplinas(disciplinas, horarioSlots, today);
+    setDisciplinaId(visible[0]?.id ?? disciplinas[0]?.id ?? "");
   }
 
   function save() {
@@ -131,18 +184,21 @@ export function DiarioManager({ turmaId, students, disciplinas, registros }: Pro
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="space-y-1 col-span-2">
-              <Label className="text-xs">Disciplina</Label>
+              <Label className="text-xs flex items-center gap-2">
+                Disciplina
+                {parityLabel && <span className="font-normal text-amber-600">{parityLabel}</span>}
+              </Label>
               <select
                 value={disciplinaId}
                 onChange={(e) => setDisciplinaId(e.target.value)}
                 className="w-full rounded-md border border-navy-200 px-3 py-1.5 text-sm"
               >
-                {disciplinas.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {discsFiltradas.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="d-data" className="text-xs">Data</Label>
-              <Input id="d-data" type="date" value={data} onChange={(e) => setData(e.target.value)} required />
+              <Input id="d-data" type="date" value={data} onChange={(e) => handleDataChange(e.target.value)} required />
             </div>
             <div className="space-y-1">
               <Label htmlFor="d-qtd" className="text-xs">Nº de aulas</Label>

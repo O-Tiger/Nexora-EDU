@@ -86,6 +86,14 @@ export async function getEventos(tenantId: string, turmaId: string) {
   });
 }
 
+/** Slots mínimos para o diário filtrar por paridade semanal. */
+export async function getHorarioSlotsForDiario(tenantId: string, turmaId: string) {
+  return prisma.horarioAula.findMany({
+    where: { tenantId, turmaId },
+    select: { disciplinaId: true, diaSemana: true, frequencia: true },
+  });
+}
+
 export async function createEvento(data: {
   tenantId: string;
   turmaId: string;

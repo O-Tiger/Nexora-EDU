@@ -7,6 +7,7 @@ import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
 import { getProfessorByUserId } from "@nexora/db/src/queries/professores";
 import { getRegistros } from "@nexora/db/src/queries/diario";
+import { getHorarioSlotsForDiario } from "@nexora/db/src/queries/horario";
 import { DiarioManager } from "@/components/secretaria/diario-manager";
 
 export const metadata: Metadata = { title: "Diário de classe" };
@@ -44,9 +45,14 @@ export default async function ProfDiarioPage({ params }: { params: Promise<{ id:
   const myDisciplinas = myVinculos.map((v) => ({ id: v.disciplina.id, name: v.disciplina.name }));
   const myIds = myDisciplinas.map((d) => d.id);
 
-  // Filter registros to only this professor's disciplines
-  const registros = await getRegistros(tenantId, turmaId);
-  const myRegistros = registros.filter((r) => myIds.includes(r.disciplinaId));
+  const [registrosTodos, horarioSlotsTodos] = await Promise.all([
+    getRegistros(tenantId, turmaId),
+    getHorarioSlotsForDiario(tenantId, turmaId),
+  ]);
+
+  // Filter to this professor's disciplines
+  const myRegistros = registrosTodos.filter((r) => myIds.includes(r.disciplinaId));
+  const horarioSlots = horarioSlotsTodos.filter((s) => myIds.includes(s.disciplinaId));
 
   return (
     <div className="space-y-5">
@@ -75,6 +81,7 @@ export default async function ProfDiarioPage({ params }: { params: Promise<{ id:
           conteudo: r.conteudo,
           presencasCount: r._count.presencas,
         }))}
+        horarioSlots={horarioSlots}
       />
     </div>
   );

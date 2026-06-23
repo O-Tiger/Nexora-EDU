@@ -7,6 +7,7 @@ import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
 import { getTurmaDisciplinas } from "@nexora/db/src/queries/pedagogico";
 import { getRegistros } from "@nexora/db/src/queries/diario";
+import { getHorarioSlotsForDiario } from "@nexora/db/src/queries/horario";
 import { DiarioManager } from "@/components/secretaria/diario-manager";
 
 export const metadata: Metadata = { title: "Diário de classe" };
@@ -29,9 +30,10 @@ export default async function DiarioPage({ params }: { params: Promise<{ id: str
   });
   if (!turma) notFound();
 
-  const [disciplinas, registros] = await Promise.all([
+  const [disciplinas, registros, horarioSlots] = await Promise.all([
     getTurmaDisciplinas(tenantId, turmaId),
     getRegistros(tenantId, turmaId),
+    getHorarioSlotsForDiario(tenantId, turmaId),
   ]);
 
   return (
@@ -61,6 +63,7 @@ export default async function DiarioPage({ params }: { params: Promise<{ id: str
           conteudo: r.conteudo,
           presencasCount: r._count.presencas,
         }))}
+        horarioSlots={horarioSlots}
       />
     </div>
   );
