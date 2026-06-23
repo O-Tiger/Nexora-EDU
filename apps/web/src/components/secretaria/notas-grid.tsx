@@ -19,6 +19,7 @@ interface Props {
   assignedDisciplinas: { id: string; name: string }[];
   grades: GradeCell[];
   attendances: AttCell[];
+  canManageDisciplinas?: boolean;
 }
 
 // Colunas de nota: 1ª/2ª/3ª avaliação (trimestres) + recuperação única + prova final
@@ -31,7 +32,7 @@ const COLUMNS: { key: string; label: string; period: number; kind: GradeKind }[]
 ];
 
 export function NotasGrid(props: Props) {
-  const { turmaId, students, allDisciplinas, assignedDisciplinas } = props;
+  const { turmaId, students, allDisciplinas, assignedDisciplinas, canManageDisciplinas = true } = props;
   const [assigned, setAssigned] = useState<Set<string>>(new Set(props.assignedIds));
   const [showAssign, setShowAssign] = useState(assignedDisciplinas.length === 0);
   const [selectedDisc, setSelectedDisc] = useState<string>(assignedDisciplinas[0]?.id ?? "");
@@ -101,6 +102,7 @@ export function NotasGrid(props: Props) {
     <div className="space-y-4">
       {/* Disciplinas da turma */}
       <div className="rounded-lg border border-navy-100 bg-white">
+        {canManageDisciplinas && (
         <button
           onClick={() => setShowAssign((v) => !v)}
           className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-navy-800 hover:bg-navy-50"
@@ -111,8 +113,9 @@ export function NotasGrid(props: Props) {
           </span>
           <span className="text-xs text-teal-600">{showAssign ? "Fechar" : "Configurar"}</span>
         </button>
+        )}
 
-        {showAssign && (
+        {canManageDisciplinas && showAssign && (
           <div className="border-t border-navy-100 p-4 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 max-h-72 overflow-y-auto">
               {allDisciplinas.map((d) => (
