@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import { CalendarDays } from "lucide-react";
-import { getFilhosFromSession } from "@/lib/responsavel";
+import { getFilhosFromSession, pickFilho } from "@/lib/responsavel";
 import { getEventos } from "@nexora/db/src/queries/horario";
 
 export const metadata: Metadata = { title: "Calendário" };
@@ -24,12 +24,20 @@ const TIPO_COLORS: Record<string, string> = {
   OUTRO: "bg-navy-100 text-navy-600",
 };
 
-export default async function ResponsavelCalendarioPage() {
+export default async function ResponsavelCalendarioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ studentId?: string }>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const filhos = await getFilhosFromSession(session.user.id, session.user.activeTenantId);
-  const filho = filhos[0];
+  const [filhos, sp] = await Promise.all([
+    getFilhosFromSession(session.user.id, session.user.activeTenantId),
+    searchParams,
+  ]);
+  const filho = pickFilho(filhos, sp.studentId);
+
   if (!filho?.turmaId) {
     return (
       <div className="space-y-4">

@@ -2,18 +2,26 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import { UserCheck } from "lucide-react";
-import { getFilhosFromSession } from "@/lib/responsavel";
+import { getFilhosFromSession, pickFilho } from "@/lib/responsavel";
 import { prisma } from "@nexora/db";
 import { getFaltasFromDiario } from "@nexora/db/src/queries/diario";
 
 export const metadata: Metadata = { title: "Frequência" };
 
-export default async function ResponsavelFrequenciaPage() {
+export default async function ResponsavelFrequenciaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ studentId?: string }>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const filhos = await getFilhosFromSession(session.user.id, session.user.activeTenantId);
-  const filho = filhos[0];
+  const [filhos, sp] = await Promise.all([
+    getFilhosFromSession(session.user.id, session.user.activeTenantId),
+    searchParams,
+  ]);
+  const filho = pickFilho(filhos, sp.studentId);
+
   if (!filho?.turmaId) {
     return (
       <div className="space-y-4">
@@ -31,26 +39,32 @@ export default async function ResponsavelFrequenciaPage() {
   });
   if (!enrollment) redirect("/responsavel" as never);
 
-  // Disciplinas da turma
-  const turmaDisciplinas = await prisma.turmaDisciplina.findMany({
-    where: { tenantId, turmaId: filho.turmaId },
-    include: { disciplina: { select: { id: true, name: true } } },
-    orderBy: { disciplina: { position: "asc" } },
-  });
+  const [turmaDisciplinas, faltasDiario, attendances, totalAulasPorDisc] = await Promise.all([
+    prisma.turmaDisciplina.findMany({
+      where: { tenantId, turmaId: filho.turmaId },
+      include: { disciplina: { select: { id: true, name: true } } },
+      orderBy: { disciplina: { position: "asc" } },
+    }),
+    getFaltasFromDiario(tenantId, filho.turmaId),
+    prisma.attendance.findMany({ where: { tenantId, enrollmentId: enrollment.id } }),
+    prisma.registroAula.groupBy({
+      by: ["disciplinaId"],
+      where: { tenantId, turmaId: filho.turmaId },
+      _sum: { quantidadeAulas: true },
+    }),
+  ]);
 
-  // Faltas do diário (por disciplina) para este aluno
-  const faltasDiario = await getFaltasFromDiario(tenantId, filho.turmaId);
-
-  // Faltas manuais (fallback)
-  const attendances = await prisma.attendance.findMany({
-    where: { tenantId, enrollmentId: enrollment.id },
-  });
+  const totalAulasMap = new Map(
+    totalAulasPorDisc.map((r) => [r.disciplinaId, r._sum.quantidadeAulas ?? 0]),
+  );
 
   const rows = turmaDisciplinas.map((td) => {
     const faltaDiario = faltasDiario.get(`${enrollment.id}|${td.disciplinaId}`);
     const faltaManual = attendances.find((a) => a.disciplinaId === td.disciplinaId)?.absences ?? 0;
     const faltas = faltaDiario !== undefined ? faltaDiario : faltaManual;
-    return { name: td.disciplina.name, faltas };
+    const totalAulas = totalAulasMap.get(td.disciplinaId) ?? 0;
+    const pct = totalAulas > 0 ? faltas / totalAulas : null;
+    return { id: td.disciplinaId, name: td.disciplina.name, faltas, totalAulas, pct };
   });
 
   const totalFaltas = rows.reduce((s, r) => s + r.faltas, 0);
@@ -67,14 +81,28 @@ export default async function ResponsavelFrequenciaPage() {
       </div>
 
       <div className="rounded-lg border border-navy-100 bg-white divide-y divide-navy-50">
-        {rows.map((row) => (
-          <div key={row.name} className="flex items-center justify-between px-4 py-3">
-            <p className="text-sm text-navy-800">{row.name}</p>
-            <span className={`text-sm font-semibold ${row.faltas > 0 ? "text-red-600" : "text-teal-600"}`}>
-              {row.faltas === 0 ? "Sem faltas" : `${row.faltas} falta${row.faltas !== 1 ? "s" : ""}`}
-            </span>
-          </div>
-        ))}
+        {rows.map((row) => {
+          const over25 = row.pct !== null && row.pct > 0.25;
+          return (
+            <div key={row.id} className="px-4 py-3 space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-navy-800">{row.name}</p>
+                <span className={`text-sm font-semibold shrink-0 ${over25 ? "text-red-600" : row.faltas > 0 ? "text-amber-600" : "text-teal-600"}`}>
+                  {row.faltas === 0 ? "Sem faltas" : `${row.faltas} falta${row.faltas !== 1 ? "s" : ""}`}
+                  {row.totalAulas > 0 && <span className="font-normal text-xs text-navy-400"> / {row.totalAulas} aulas</span>}
+                </span>
+              </div>
+              {row.totalAulas > 0 && (
+                <div className="h-1.5 rounded-full bg-navy-100 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${over25 ? "bg-red-500" : row.faltas > 0 ? "bg-amber-400" : "bg-teal-400"}`}
+                    style={{ width: `${Math.min(100, (row.faltas / row.totalAulas) * 100).toFixed(1)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
         {rows.length === 0 && (
           <p className="px-4 py-6 text-sm text-navy-400 text-center">Nenhuma disciplina registrada.</p>
         )}
@@ -85,9 +113,11 @@ export default async function ResponsavelFrequenciaPage() {
           <p className="text-sm font-semibold text-amber-800">
             Total acumulado: {totalFaltas} falta{totalFaltas !== 1 ? "s" : ""}
           </p>
-          <p className="text-xs text-amber-600 mt-0.5">
-            O limite de faltas é definido pela grade curricular de cada disciplina.
-          </p>
+          {rows.some((r) => r.pct !== null && r.pct > 0.25) && (
+            <p className="text-xs text-red-700 mt-0.5 font-medium">
+              Atenção: uma ou mais disciplinas ultrapassaram 25% de faltas.
+            </p>
+          )}
         </div>
       )}
     </div>

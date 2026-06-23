@@ -1,19 +1,28 @@
 import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
-import { FileText } from "lucide-react";
-import { getFilhosFromSession } from "@/lib/responsavel";
+import Link from "next/link";
+import { FileText, Download } from "lucide-react";
+import { getFilhosFromSession, pickFilho } from "@/lib/responsavel";
 import { getBoletimData } from "@nexora/db/src/queries/pedagogico";
 import { prisma } from "@nexora/db";
 
 export const metadata: Metadata = { title: "Boletim" };
 
-export default async function ResponsavelBoletimPage() {
+export default async function ResponsavelBoletimPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ studentId?: string }>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const filhos = await getFilhosFromSession(session.user.id, session.user.activeTenantId);
-  const filho = filhos[0];
+  const [filhos, sp] = await Promise.all([
+    getFilhosFromSession(session.user.id, session.user.activeTenantId),
+    searchParams,
+  ]);
+  const filho = pickFilho(filhos, sp.studentId);
+
   if (!filho?.turmaId) {
     return (
       <div className="space-y-4">
@@ -23,7 +32,6 @@ export default async function ResponsavelBoletimPage() {
     );
   }
 
-  // Busca enrollmentId do filho para filtrar apenas as notas dele
   const enrollment = await prisma.turmaEnrollment.findFirst({
     where: { tenantId: session.user.activeTenantId, studentId: filho.studentId, turmaId: filho.turmaId, status: "ATIVA" },
     select: { id: true },
@@ -44,15 +52,26 @@ export default async function ResponsavelBoletimPage() {
   const periods = [1, 2, 3];
   const kinds = ["AVA", "RECP"] as const;
 
+  const pdfUrl = `/api/responsavel/boletim?turmaId=${filho.turmaId}${enrollment ? `&enrollmentId=${enrollment.id}` : ""}&format=pdf`;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-navy-900 flex items-center gap-2">
-          <FileText className="h-5 w-5 text-teal-500" /> Boletim
-        </h1>
-        <p className="text-sm text-navy-500">
-          {filho.studentName} · Turma {boletim.turma.code} · {boletim.turma.year}
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-bold text-navy-900 flex items-center gap-2">
+            <FileText className="h-5 w-5 text-teal-500" /> Boletim
+          </h1>
+          <p className="text-sm text-navy-500">
+            {filho.studentName} · Turma {boletim.turma.code} · {boletim.turma.year}
+          </p>
+        </div>
+        <Link
+          href={pdfUrl as never}
+          target="_blank"
+          className="inline-flex items-center gap-2 rounded-md border border-navy-200 bg-white px-3 py-1.5 text-sm text-navy-700 hover:bg-navy-50 transition-colors"
+        >
+          <Download className="h-4 w-4" /> Baixar PDF
+        </Link>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-navy-100 bg-white">
@@ -94,9 +113,9 @@ export default async function ResponsavelBoletimPage() {
                   })
                 ))}
                 <td className="px-3 py-2 text-center">
-                  {row.grades["p1-FINAL"] !== undefined ? (
-                    <span className={row.grades["p1-FINAL"]! < 5 ? "text-red-600 font-semibold" : "text-navy-800"}>
-                      {(row.grades["p1-FINAL"]!).toFixed(1)}
+                  {row.grades["p0-FINAL"] != null ? (
+                    <span className={row.grades["p0-FINAL"]! < 5 ? "text-red-600 font-semibold" : "text-navy-800"}>
+                      {row.grades["p0-FINAL"]!.toFixed(1)}
                     </span>
                   ) : <span className="text-navy-300">—</span>}
                 </td>
@@ -106,6 +125,17 @@ export default async function ResponsavelBoletimPage() {
           </tbody>
         </table>
       </div>
+
+      {aluno.totalAbsences > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800">
+            Total de faltas: {aluno.totalAbsences}
+          </p>
+          <p className="text-xs text-amber-600 mt-0.5">
+            O limite de faltas é definido pela grade curricular de cada disciplina.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { FileText, UserCheck, CalendarDays, DollarSign, ChevronRight } from "lucide-react";
-import { getFilhosFromSession } from "@/lib/responsavel";
+import { getFilhosFromSession, pickFilho } from "@/lib/responsavel";
 import { prisma } from "@nexora/db";
 import { getMensalidadesByStudent } from "@nexora/db/src/queries/financeiro";
 
@@ -16,28 +16,37 @@ const quickLinks = [
   { href: "/responsavel/mensalidades", label: "Mensalidades", icon: DollarSign, desc: "Situação financeira" },
 ];
 
-export default async function ResponsavelDashboard() {
+export default async function ResponsavelDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ studentId?: string }>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const filhos = await getFilhosFromSession(session.user.id, session.user.activeTenantId);
-  const filho = filhos[0];
+  const [filhos, sp] = await Promise.all([
+    getFilhosFromSession(session.user.id, session.user.activeTenantId),
+    searchParams,
+  ]);
+  const filho = pickFilho(filhos, sp.studentId);
   if (!filho) redirect("/login");
 
-  // Próximos eventos (3 mais próximos)
-  const hoje = new Date();
-  const proximosEventos = filho.turmaId
-    ? await prisma.eventoCalendario.findMany({
-        where: { tenantId: session.user.activeTenantId, turmaId: filho.turmaId, data: { gte: hoje } },
-        orderBy: { data: "asc" },
-        take: 3,
-      })
-    : [];
+  const studentParam = sp.studentId ? `?studentId=${sp.studentId}` : "";
 
-  // Mensalidades pendentes/vencidas
-  const mensalidades = filho.anoLetivoId
-    ? await getMensalidadesByStudent(session.user.activeTenantId, filho.studentId, filho.anoLetivoId)
-    : [];
+  const hoje = new Date();
+  const [proximosEventos, mensalidades] = await Promise.all([
+    filho.turmaId
+      ? prisma.eventoCalendario.findMany({
+          where: { tenantId: session.user.activeTenantId, turmaId: filho.turmaId, data: { gte: hoje } },
+          orderBy: { data: "asc" },
+          take: 3,
+        })
+      : Promise.resolve([]),
+    filho.anoLetivoId
+      ? getMensalidadesByStudent(session.user.activeTenantId, filho.studentId, filho.anoLetivoId)
+      : Promise.resolve([]),
+  ]);
+
   const pendencias = mensalidades.filter((m) => m.status === "PENDENTE" || m.status === "VENCIDA");
 
   return (
@@ -59,7 +68,7 @@ export default async function ResponsavelDashboard() {
             </p>
             <p className="text-xs text-red-600 mt-0.5">Acesse a seção de mensalidades para mais detalhes.</p>
           </div>
-          <Link href={"/responsavel/mensalidades" as never}>
+          <Link href={`/responsavel/mensalidades${studentParam}` as never}>
             <ChevronRight className="h-5 w-5 text-red-500" />
           </Link>
         </div>
@@ -69,7 +78,7 @@ export default async function ResponsavelDashboard() {
         {quickLinks.map(({ href, label, icon: Icon, desc }) => (
           <Link
             key={href}
-            href={href as never}
+            href={`${href}${studentParam}` as never}
             className="group rounded-lg border border-navy-100 bg-white p-5 flex items-center gap-4 hover:border-teal-300 hover:shadow-sm transition-all"
           >
             <div className="rounded-full bg-teal-50 p-3 group-hover:bg-teal-100 transition-colors">

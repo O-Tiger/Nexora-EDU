@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import { DollarSign, CheckCircle, AlertCircle, Clock } from "lucide-react";
-import { getFilhosFromSession } from "@/lib/responsavel";
+import { getFilhosFromSession, pickFilho } from "@/lib/responsavel";
 import { getMensalidadesByStudent } from "@nexora/db/src/queries/financeiro";
 import { MESES_LABELS, MENSALIDADE_STATUS_LABELS, MENSALIDADE_TIPO_LABELS } from "@nexora/validators";
 
@@ -26,12 +26,19 @@ function formatBRL(cents: number) {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default async function ResponsavelMensalidadesPage() {
+export default async function ResponsavelMensalidadesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ studentId?: string }>;
+}) {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const filhos = await getFilhosFromSession(session.user.id, session.user.activeTenantId);
-  const filho = filhos[0];
+  const [filhos, sp] = await Promise.all([
+    getFilhosFromSession(session.user.id, session.user.activeTenantId),
+    searchParams,
+  ]);
+  const filho = pickFilho(filhos, sp.studentId);
   if (!filho) redirect("/responsavel" as never);
 
   const mensalidades = await getMensalidadesByStudent(

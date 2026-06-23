@@ -26,9 +26,6 @@ export default async function ResponsavelLayout({ children }: { children: React.
     );
   }
 
-  // Primeiro filho como padrão (maioria dos casos é filho único)
-  const filho = filhos[0]!;
-
   const onboarding = await getOnboardingStatus(session.user.id, "responsavel");
   const showTour = !onboarding.completed && !onboarding.skipped;
 
@@ -36,8 +33,7 @@ export default async function ResponsavelLayout({ children }: { children: React.
     <div className="flex min-h-screen bg-navy-50">
       <ResponsavelSidebar
         user={{ name: session.user.name }}
-        filhoNome={filho.studentName}
-        turmaCode={filho.turmaCode}
+        filhos={filhos}
       />
       <main id="main-content" className="flex-1 overflow-x-hidden" tabIndex={-1}>
         <div className="mx-auto max-w-4xl p-6 pt-16 lg:pt-6">{children}</div>
