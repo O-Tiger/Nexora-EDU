@@ -8,6 +8,7 @@ import {
   createDisciplina, deleteDisciplina, setTurmaDisciplinas,
   upsertGrade, upsertAttendance,
   updateDisciplinaColor, setTurmaDisciplinaProfessor, setMateriaColors,
+  updateDisciplinaItinerario, setEnrollmentFrente, removeEnrollmentFrente,
 } from "@nexora/db/src/queries/pedagogico";
 import type { GradeKind } from "@nexora/db";
 
@@ -118,5 +119,26 @@ export async function saveAttendanceAction(input: {
   const { tenantId } = await requireStaff();
   if (input.absences < 0 || input.absences > 999) return { error: "Faltas inválidas" };
   await upsertAttendance({ tenantId, ...input });
+  return { success: true };
+}
+
+export async function setDisciplinaItinerarioAction(id: string, isItinerario: boolean) {
+  const { tenantId } = await requireStaff();
+  await updateDisciplinaItinerario(id, tenantId, isItinerario);
+  revalidatePath("/admin/secretaria/disciplinas");
+  return { success: true };
+}
+
+export async function setEnrollmentFrenteAction(
+  enrollmentId: string,
+  disciplinaId: string,
+  frenteId: string | null,
+) {
+  const { tenantId } = await requireStaff();
+  if (frenteId) {
+    await setEnrollmentFrente(tenantId, enrollmentId, disciplinaId, frenteId);
+  } else {
+    await removeEnrollmentFrente(enrollmentId, disciplinaId);
+  }
   return { success: true };
 }

@@ -2,12 +2,12 @@
 
 import { useState, useTransition, useMemo } from "react";
 import { Button, Input, toast } from "@nexora/ui";
-import { Plus, Trash2, CornerDownRight, BookMarked, ArrowDownUp } from "lucide-react";
-import { createDisciplinaAction, deleteDisciplinaAction, setDisciplinaColorAction, setMateriaColorAction } from "@/actions/pedagogico";
+import { Plus, Trash2, CornerDownRight, BookMarked, ArrowDownUp, RouteIcon } from "lucide-react";
+import { createDisciplinaAction, deleteDisciplinaAction, setDisciplinaColorAction, setMateriaColorAction, setDisciplinaItinerarioAction } from "@/actions/pedagogico";
 import { useConfirm } from "@/hooks/use-confirm";
 
 interface Frente { id: string; name: string; position: number; color: string | null }
-interface Disciplina { id: string; name: string; position: number; color: string | null; frentes: Frente[] }
+interface Disciplina { id: string; name: string; position: number; color: string | null; isItinerario: boolean; frentes: Frente[] }
 
 type SortMode = "alpha" | "alpha-desc" | "frentes-desc" | "frentes-asc";
 const SORT_LABELS: Record<SortMode, string> = {
@@ -90,6 +90,11 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
     setFrenteFor(null);
   }
 
+  function toggleItinerario(id: string, current: boolean) {
+    setDisciplinas((prev) => prev.map((d) => d.id === id ? { ...d, isItinerario: !current } : d));
+    startTransition(async () => { await setDisciplinaItinerarioAction(id, !current); });
+  }
+
   async function remove(id: string, name: string, hasFrentes: boolean) {
     const ok = await confirm({
       title: `Excluir ${name}?`,
@@ -147,6 +152,11 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
                 <div className="flex items-center gap-2">
                   <BookMarked className="h-4 w-4 text-teal-500" aria-hidden="true" />
                   <span className="font-medium text-navy-900">{d.name}</span>
+                  {d.isItinerario && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                      <RouteIcon className="h-3 w-3" /> Itinerário
+                    </span>
+                  )}
                   {d.frentes.length > 0 && (
                     <span className="text-xs text-navy-400">{d.frentes.length} frente{d.frentes.length !== 1 ? "s" : ""}</span>
                   )}
@@ -160,6 +170,14 @@ export function DisciplinasManager({ initial }: { initial: Disciplina[] }) {
                     title={d.frentes.length > 0 ? "Cor da matéria (gera tons nas frentes)" : "Cor na grade de horários"}
                     aria-label={`Cor de ${d.name}`}
                   />
+                  <button
+                    onClick={() => toggleItinerario(d.id, d.isItinerario)}
+                    disabled={isPending}
+                    className={`text-xs hover:underline ${d.isItinerario ? "text-amber-600" : "text-navy-400 hover:text-amber-600"}`}
+                    title={d.isItinerario ? "Desmarcar como itinerário formativo" : "Marcar como itinerário formativo"}
+                  >
+                    {d.isItinerario ? "− itinerário" : "+ itinerário"}
+                  </button>
                   <button
                     onClick={() => { setFrenteFor(frenteFor === d.id ? null : d.id); setFrenteName(""); }}
                     className="text-xs text-teal-600 hover:underline"

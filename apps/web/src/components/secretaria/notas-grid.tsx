@@ -11,6 +11,8 @@ interface DiscOption { id: string; name: string; isFrente: boolean }
 interface GradeCell { enrollmentId: string; disciplinaId: string; period: number; kind: GradeKind; score: number | null }
 interface AttCell { enrollmentId: string; disciplinaId: string; absences: number }
 
+interface EnrollmentFrenteRow { enrollmentId: string; disciplinaId: string; frenteId: string; frenteName: string }
+
 interface Props {
   turmaId: string;
   students: Student[];
@@ -20,6 +22,10 @@ interface Props {
   grades: GradeCell[];
   attendances: AttCell[];
   canManageDisciplinas?: boolean;
+  /** frenteId → parentId, only for frentes of isItinerario parents */
+  itinerarioFrenteOf?: Record<string, string>;
+  /** enrollment frente assignments for itinerário disciplines */
+  enrollmentFrentes?: EnrollmentFrenteRow[];
 }
 
 // Colunas de nota: 1ª/2ª/3ª avaliação (trimestres) + recuperação única + prova final
@@ -32,7 +38,16 @@ const COLUMNS: { key: string; label: string; period: number; kind: GradeKind }[]
 ];
 
 export function NotasGrid(props: Props) {
-  const { turmaId, students, allDisciplinas, assignedDisciplinas, canManageDisciplinas = true } = props;
+  const { turmaId, students, allDisciplinas, assignedDisciplinas, canManageDisciplinas = true,
+    itinerarioFrenteOf = {}, enrollmentFrentes = [] } = props;
+
+  // Map `${enrollmentId}|${parentId}` → frenteId for itinerário lookup
+  const efMap = new Map<string, string>();
+  for (const r of enrollmentFrentes) efMap.set(`${r.enrollmentId}|${r.disciplinaId}`, r.frenteId);
+
+  // Map frenteId → frenteName
+  const frenteNameMap = new Map<string, string>();
+  for (const r of enrollmentFrentes) frenteNameMap.set(r.frenteId, r.frenteName);
   const [assigned, setAssigned] = useState<Set<string>>(new Set(props.assignedIds));
   const [showAssign, setShowAssign] = useState(assignedDisciplinas.length === 0);
   const [selectedDisc, setSelectedDisc] = useState<string>(assignedDisciplinas[0]?.id ?? "");
@@ -163,36 +178,59 @@ export function NotasGrid(props: Props) {
                   </tr>
                 </thead>
                 <tbody key={selectedDisc} className="divide-y divide-navy-50">
-                  {students.map((s) => (
-                    <tr key={s.enrollmentId}>
-                      <td className="px-3 py-1.5 font-medium text-navy-800 whitespace-nowrap sticky left-0 bg-white">{s.name}</td>
-                      {COLUMNS.map((c) => {
-                        const val = grades.get(`${s.enrollmentId}|${selectedDisc}|${c.period}-${c.kind}`);
-                        return (
-                          <td key={c.key} className="px-1 py-1">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              defaultValue={val != null ? String(val) : ""}
-                              onBlur={(e) => onGradeBlur(s.enrollmentId, c.period, c.kind, e.target.value)}
-                              className="w-14 rounded border border-navy-200 px-1.5 py-1 text-center text-sm focus-ring"
-                              aria-label={`${c.label} de ${s.name}`}
-                            />
-                          </td>
-                        );
-                      })}
-                      <td className="px-1 py-1">
-                        <input
-                          type="number"
-                          min={0}
-                          defaultValue={absences.get(`${s.enrollmentId}|${selectedDisc}`) ?? 0}
-                          onBlur={(e) => onAbsenceBlur(s.enrollmentId, e.target.value)}
-                          className="w-14 rounded border border-navy-200 px-1.5 py-1 text-center text-sm focus-ring"
-                          aria-label={`Faltas de ${s.name}`}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  {students.map((s) => {
+                    // Itinerário locking: if selectedDisc is a frente of an itinerário parent,
+                    // only allow editing for students whose assigned frente matches selectedDisc
+                    const itinerarioParentId = itinerarioFrenteOf[selectedDisc];
+                    const studentFrenteId = itinerarioParentId
+                      ? efMap.get(`${s.enrollmentId}|${itinerarioParentId}`)
+                      : undefined;
+                    const isLocked = itinerarioParentId !== undefined && studentFrenteId !== selectedDisc;
+                    const frenteBadge = itinerarioParentId && studentFrenteId
+                      ? frenteNameMap.get(studentFrenteId)
+                      : undefined;
+
+                    return (
+                      <tr key={s.enrollmentId} className={isLocked ? "opacity-40" : undefined}>
+                        <td className="px-3 py-1.5 font-medium text-navy-800 whitespace-nowrap sticky left-0 bg-white">
+                          <span>{s.name}</span>
+                          {frenteBadge && studentFrenteId !== selectedDisc && (
+                            <span className="ml-2 text-xs text-amber-600 font-normal">({frenteBadge})</span>
+                          )}
+                          {itinerarioParentId && !studentFrenteId && (
+                            <span className="ml-2 text-xs text-navy-400 font-normal">sem trilha</span>
+                          )}
+                        </td>
+                        {COLUMNS.map((c) => {
+                          const val = grades.get(`${s.enrollmentId}|${selectedDisc}|${c.period}-${c.kind}`);
+                          return (
+                            <td key={c.key} className="px-1 py-1">
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                defaultValue={val != null ? String(val) : ""}
+                                onBlur={(e) => !isLocked && onGradeBlur(s.enrollmentId, c.period, c.kind, e.target.value)}
+                                disabled={isLocked}
+                                className="w-14 rounded border border-navy-200 px-1.5 py-1 text-center text-sm focus-ring disabled:bg-navy-50 disabled:cursor-not-allowed"
+                                aria-label={`${c.label} de ${s.name}`}
+                              />
+                            </td>
+                          );
+                        })}
+                        <td className="px-1 py-1">
+                          <input
+                            type="number"
+                            min={0}
+                            defaultValue={absences.get(`${s.enrollmentId}|${selectedDisc}`) ?? 0}
+                            onBlur={(e) => !isLocked && onAbsenceBlur(s.enrollmentId, e.target.value)}
+                            disabled={isLocked}
+                            className="w-14 rounded border border-navy-200 px-1.5 py-1 text-center text-sm focus-ring disabled:bg-navy-50 disabled:cursor-not-allowed"
+                            aria-label={`Faltas de ${s.name}`}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

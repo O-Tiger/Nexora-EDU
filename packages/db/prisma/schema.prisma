@@ -773,6 +773,7 @@ model TurmaEnrollment {
   grades      Grade[]
   attendances Attendance[]
   presencas   PresencaAluno[]
+  enrollmentFrentes EnrollmentFrente[]
 
   /// Um aluno só pode estar em uma turma por ano letivo
   @@unique([studentId, anoLetivoId])
@@ -833,6 +834,9 @@ model Disciplina {
   /// Cor (hex) usada na grade de horários e identidade visual
   color     String?
   active    Boolean  @default(true)
+  /// Itinerário Formativo: cada aluno escolhe uma frente (trilha). Apenas a frente
+  /// escolhida aparece no boletim e aceita lançamento de notas para aquele aluno.
+  isItinerario Boolean @default(false)
   createdAt DateTime @default(now())
 
   parent           Disciplina?       @relation("Frentes", fields: [parentId], references: [id], onDelete: Cascade)
@@ -842,9 +846,31 @@ model Disciplina {
   attendances      Attendance[]
   registros        RegistroAula[]
   horarios         HorarioAula[]
+  enrollmentFrentesAsParent EnrollmentFrente[] @relation("EFParent")
+  enrollmentFrentesAsFrente EnrollmentFrente[] @relation("EFFrente")
 
   @@index([tenantId, parentId])
   @@index([tenantId, active])
+}
+
+/// Itinerário Formativo: vincula um aluno matriculado à frente (trilha) que ele
+/// escolheu dentro de uma disciplina de itinerário (ex: IFO → Marketing).
+/// Apenas a frente escolhida aparece no boletim e aceita notas para este aluno.
+model EnrollmentFrente {
+  id           String @id @default(cuid())
+  tenantId     String
+  enrollmentId String
+  /// Disciplina-pai marcada como isItinerario (ex: IFO)
+  disciplinaId String
+  /// Frente escolhida pelo aluno (ex: Marketing — filha de IFO)
+  frenteId     String
+
+  enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  disciplina Disciplina      @relation("EFParent", fields: [disciplinaId], references: [id], onDelete: Cascade)
+  frente     Disciplina      @relation("EFFrente", fields: [frenteId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, disciplinaId])
+  @@index([tenantId, disciplinaId])
 }
 
 /// Vínculo disciplina ↔ turma (quais disciplinas a turma cursa).

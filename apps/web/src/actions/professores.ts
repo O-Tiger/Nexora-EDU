@@ -43,8 +43,8 @@ export async function createProfessorAction(formData: FormData) {
     ...(parsed.data.email && { email: parsed.data.email }),
     ...(parsed.data.phone && { phone: parsed.data.phone }),
   });
-  revalidatePath("/admin/secretaria/professores");
-  return { success: true };
+revalidatePath("/admin/secretaria/professores");
+return { success: true };
 }
 
 export async function deleteProfessorAction(id: string) {

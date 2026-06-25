@@ -5,8 +5,9 @@ import Link from "next/link";
 import { ArrowLeft, FileText } from "lucide-react";
 import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
-import { getDisciplinas, getTurmaDisciplinas } from "@nexora/db/src/queries/pedagogico";
+import { getDisciplinas, getTurmaDisciplinas, getEnrollmentFrentes } from "@nexora/db/src/queries/pedagogico";
 import { NotasGrid } from "@/components/secretaria/notas-grid";
+import { ItinerarioPanel } from "@/components/secretaria/itinerario-panel";
 
 export const metadata: Metadata = { title: "Lançar notas" };
 
@@ -39,14 +40,34 @@ export default async function NotasPage({ params }: { params: Promise<{ id: stri
     prisma.attendance.findMany({ where: { tenantId, enrollmentId: { in: enrollmentIds } } }),
   ]);
 
-  // Flatten assigned (root + frentes) into selectable gradeable disciplinas
-  const assignedFlat = assigned.map((d) => ({ id: d.id, name: d.name, parentId: d.parentId }));
+  // assignedIds for quick lookup
+  const assignedIdSet = new Set(assigned.map((d) => d.id));
 
-  // Flat list of all disciplinas (root + frentes) for the assignment multi-select
+  // Itinerário parents that have at least one frente assigned to this turma
+  const itinerarioParents = allDisciplinas.filter(
+    (d) => d.isItinerario && d.frentes.some((f) => assignedIdSet.has(f.id)),
+  );
+
+  // frenteId → parentId (only for itinerário parents)
+  const itinerarioFrenteOf: Record<string, string> = {};
+  for (const p of itinerarioParents) {
+    for (const f of p.frentes) itinerarioFrenteOf[f.id] = p.id;
+  }
+
+  // Fetch enrollment frentes for all itinerário parents in this turma
+  const enrollmentFrentesRows = itinerarioParents.length > 0
+    ? (await Promise.all(itinerarioParents.map((p) => getEnrollmentFrentes(tenantId, turmaId, p.id)))).flat()
+    : [];
+
+  // Flat list of all disciplinas for the assignment multi-select
   const allFlat = allDisciplinas.flatMap((d) => [
     { id: d.id, name: d.name, isFrente: false },
     ...d.frentes.map((f) => ({ id: f.id, name: `${d.name} › ${f.name}`, isFrente: true })),
   ]);
+
+  const assignedFlat = assigned.map((d) => ({ id: d.id, name: d.name, parentId: d.parentId }));
+
+  const students = turma.enrollments.map((e) => ({ enrollmentId: e.id, name: e.student.name }));
 
   return (
     <div className="space-y-5">
@@ -65,14 +86,28 @@ export default async function NotasPage({ params }: { params: Promise<{ id: stri
         </Button>
       </div>
 
+      {itinerarioParents.length > 0 && (
+        <ItinerarioPanel
+          students={students}
+          itinerarioParents={itinerarioParents.map((p) => ({
+            id: p.id,
+            name: p.name,
+            frentes: p.frentes.filter((f) => assignedIdSet.has(f.id)).map((f) => ({ id: f.id, name: f.name })),
+          }))}
+          enrollmentFrentes={enrollmentFrentesRows}
+        />
+      )}
+
       <NotasGrid
         turmaId={turmaId}
-        students={turma.enrollments.map((e) => ({ enrollmentId: e.id, name: e.student.name }))}
+        students={students}
         allDisciplinas={allFlat}
         assignedIds={assignedFlat.map((d) => d.id)}
         assignedDisciplinas={assignedFlat.map((d) => ({ id: d.id, name: d.name }))}
         grades={grades.map((g) => ({ enrollmentId: g.enrollmentId, disciplinaId: g.disciplinaId, period: g.period, kind: g.kind, score: g.score }))}
         attendances={attendances.map((a) => ({ enrollmentId: a.enrollmentId, disciplinaId: a.disciplinaId, absences: a.absences }))}
+        itinerarioFrenteOf={itinerarioFrenteOf}
+        enrollmentFrentes={enrollmentFrentesRows}
       />
     </div>
   );

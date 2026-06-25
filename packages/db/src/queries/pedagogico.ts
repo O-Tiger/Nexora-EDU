@@ -18,15 +18,21 @@ export async function createDisciplina(data: {
   name: string;
   parentId?: string;
   position?: number;
+  isItinerario?: boolean;
 }) {
   return prisma.disciplina.create({
     data: {
       tenantId: data.tenantId,
       name: data.name,
       position: data.position ?? 0,
+      isItinerario: data.isItinerario ?? false,
       ...(data.parentId && { parentId: data.parentId }),
     },
   });
+}
+
+export async function updateDisciplinaItinerario(id: string, tenantId: string, isItinerario: boolean) {
+  return prisma.disciplina.updateMany({ where: { id, tenantId }, data: { isItinerario } });
 }
 
 export async function deleteDisciplina(id: string, tenantId: string) {
@@ -108,6 +114,36 @@ export async function setMateriaColors(
   });
   await prisma.$transaction(ops);
   return colorById;
+}
+
+// ─── Itinerário Formativo: frentes por aluno ─────────────────────────────────
+
+/** Retorna o mapa enrollmentId → frenteId para uma disciplina de itinerário numa turma. */
+export async function getEnrollmentFrentes(tenantId: string, turmaId: string, disciplinaId: string) {
+  const rows = await prisma.enrollmentFrente.findMany({
+    where: { tenantId, disciplinaId, enrollment: { turmaId } },
+    select: { enrollmentId: true, disciplinaId: true, frenteId: true, frente: { select: { id: true, name: true } } },
+  });
+  return rows.map((r) => ({ enrollmentId: r.enrollmentId, disciplinaId: r.disciplinaId, frenteId: r.frenteId, frenteName: r.frente.name }));
+}
+
+/** Define (ou atualiza) a frente escolhida por um aluno numa disciplina de itinerário. */
+export async function setEnrollmentFrente(
+  tenantId: string,
+  enrollmentId: string,
+  disciplinaId: string,
+  frenteId: string,
+) {
+  return prisma.enrollmentFrente.upsert({
+    where: { enrollmentId_disciplinaId: { enrollmentId, disciplinaId } },
+    update: { frenteId },
+    create: { tenantId, enrollmentId, disciplinaId, frenteId },
+  });
+}
+
+/** Remove a frente escolhida (aluno volta a não ter trilha atribuída). */
+export async function removeEnrollmentFrente(enrollmentId: string, disciplinaId: string) {
+  return prisma.enrollmentFrente.deleteMany({ where: { enrollmentId, disciplinaId } });
 }
 
 // ─── Vínculo turma ↔ disciplina ──────────────────────────────────────────────
@@ -276,38 +312,53 @@ export async function getBoletimData(
       frentesByParent.set(d.parentId, arr);
     }
   }
-  const orderedDisciplinas: { id: string; name: string; isFrente: boolean; parentId: string | null }[] = [];
+  const orderedDisciplinas: { id: string; name: string; isFrente: boolean; parentId: string | null; isItinerarioFrente: boolean }[] = [];
+  const itinerarioParentIds = new Set(roots.filter((r) => r.isItinerario).map((r) => r.id));
   for (const root of roots) {
-    orderedDisciplinas.push({ id: root.id, name: root.name, isFrente: false, parentId: null });
+    orderedDisciplinas.push({ id: root.id, name: root.name, isFrente: false, parentId: null, isItinerarioFrente: false });
     const fr = (frentesByParent.get(root.id) ?? []).sort((a, b) => a.position - b.position);
-    for (const f of fr) orderedDisciplinas.push({ id: f.id, name: f.name, isFrente: true, parentId: root.id });
+    for (const f of fr) orderedDisciplinas.push({
+      id: f.id, name: f.name, isFrente: true, parentId: root.id,
+      isItinerarioFrente: itinerarioParentIds.has(root.id),
+    });
   }
   // Frentes órfãs (pai não vinculado à turma) — incluir mesmo assim
   for (const d of disciplinas) {
     if (d.parentId && !roots.find((r) => r.id === d.parentId) && !orderedDisciplinas.find((o) => o.id === d.id)) {
-      orderedDisciplinas.push({ id: d.id, name: d.name, isFrente: true, parentId: d.parentId });
+      orderedDisciplinas.push({
+        id: d.id, name: d.name, isFrente: true, parentId: d.parentId,
+        isItinerarioFrente: itinerarioParentIds.has(d.parentId),
+      });
     }
   }
 
   const enrollmentIds = turma.enrollments.map((e) => e.id);
-  const [grades, attendances, faltasDiario, diarioCount] = await Promise.all([
+  const [grades, attendances, faltasDiario, diarioCount, enrollmentFrentesRaw] = await Promise.all([
     prisma.grade.findMany({ where: { tenantId, enrollmentId: { in: enrollmentIds } } }),
     prisma.attendance.findMany({ where: { tenantId, enrollmentId: { in: enrollmentIds } } }),
     getFaltasFromDiario(tenantId, turmaId),
     prisma.registroAula.count({ where: { tenantId, turmaId } }),
+    itinerarioParentIds.size > 0
+      ? prisma.enrollmentFrente.findMany({
+          where: { enrollmentId: { in: enrollmentIds }, disciplinaId: { in: [...itinerarioParentIds] } },
+          select: { enrollmentId: true, disciplinaId: true, frenteId: true },
+        })
+      : Promise.resolve([]),
   ]);
+  // `${enrollmentId}|${parentId}` → frenteId
+  const efMap = new Map<string, string>();
+  for (const r of enrollmentFrentesRaw) efMap.set(`${r.enrollmentId}|${r.disciplinaId}`, r.frenteId);
   // Se a turma tem diário lançado, as faltas vêm dele (default 0); senão, do manual
   const diarioAtivo = diarioCount > 0;
 
   const students: BoletimStudent[] = turma.enrollments.map((enr, idx) => {
-    const rows: BoletimDisciplinaRow[] = orderedDisciplinas.map((d) => {
+    const allRows: BoletimDisciplinaRow[] = orderedDisciplinas.map((d) => {
       const cellGrades: Record<string, number | null> = {};
       for (const g of grades) {
         if (g.enrollmentId === enr.id && g.disciplinaId === d.id) {
           cellGrades[`p${g.period}-${g.kind}`] = g.score ?? null;
         }
       }
-      // Faltas: diário ativo → conta do diário (default 0); senão, falta manual
       const att = attendances.find((a) => a.enrollmentId === enr.id && a.disciplinaId === d.id);
       const absences = diarioAtivo
         ? (faltasDiario.get(`${enr.id}|${d.id}`) ?? 0)
@@ -321,6 +372,15 @@ export async function getBoletimData(
         absences,
       };
     });
+
+    // For itinerário disciplines: only keep the frente the student chose; skip others
+    const rows = allRows.filter((r) => {
+      const od = orderedDisciplinas.find((o) => o.id === r.disciplinaId);
+      if (!od?.isItinerarioFrente || !r.parentId) return true;
+      const assigned = efMap.get(`${enr.id}|${r.parentId}`);
+      return assigned === r.disciplinaId;
+    });
+
     const totalAbsences = rows.reduce((sum, r) => sum + r.absences, 0);
     return {
       enrollmentId: enr.id,
