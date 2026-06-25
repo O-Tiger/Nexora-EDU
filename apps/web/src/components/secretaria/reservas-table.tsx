@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button, Input, Label, toast } from "@nexora/ui";
+import { Button, Input, toast } from "@nexora/ui";
 import { CheckCircle, Clock, Ban, XCircle, BookmarkCheck } from "lucide-react";
 import { RESERVA_STATUS_LABELS } from "@nexora/validators";
 import { confirmarReservaAction, cancelarReservaAction } from "@/actions/reservas";

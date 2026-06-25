@@ -5,7 +5,6 @@ import { Button, Input, Label, toast } from "@nexora/ui";
 import { Plus } from "lucide-react";
 import { createReservaAction } from "@/actions/reservas";
 
-type Turma = { id: string; code: string; etapa: string; ano: number };
 type AlunoEnrollment = { studentId: string; studentName: string; turmaId: string; turmaCode: string };
 
 type Props = {

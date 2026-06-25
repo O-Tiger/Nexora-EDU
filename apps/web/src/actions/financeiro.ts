@@ -7,7 +7,7 @@ import { prisma } from "@nexora/db";
 import { PlanoCobrancaSchema, GerarMensalidadesSchema, UpdateMensalidadeSchema } from "@nexora/validators";
 import {
   createPlanoCobranca, updatePlanoCobranca, deletePlanoCobranca,
-  getMensalidadesByAnoLetivo, upsertMensalidade, updateMensalidadeStatus,
+  upsertMensalidade, updateMensalidadeStatus,
   markVencidas,
 } from "@nexora/db/src/queries/financeiro";
 import { createAuditLog } from "@nexora/db/src/queries/audit";
