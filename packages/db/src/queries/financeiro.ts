@@ -26,7 +26,7 @@ export async function createPlanoCobranca(tenantId: string, data: {
   return prisma.planoCobranca.create({ data: { ...data, tenantId } });
 }
 
-export async function updatePlanoCobranca(tenantId: string, id: string, data: {
+export async function updatePlanoCobranca(_tenantId: string, id: string, data: {
   nome?: string;
   valorCents?: number;
   vencimentoDia?: number;
@@ -123,7 +123,7 @@ export async function upsertMensalidade(tenantId: string, data: {
 }
 
 export async function updateMensalidadeStatus(
-  tenantId: string,
+  _tenantId: string,
   id: string,
   data: { status: MensalidadeStatus; paidAt?: Date | null; descontoCents?: number },
 ) {

@@ -25,7 +25,7 @@ export async function getReservasByAnoLetivo(
   });
 }
 
-export async function getReservaByStudent(tenantId: string, studentId: string, anoLetivoAtualId: string) {
+export async function getReservaByStudent(_tenantId: string, studentId: string, anoLetivoAtualId: string) {
   return prisma.reservaVaga.findUnique({
     where: { studentId_anoLetivoAtualId: { studentId, anoLetivoAtualId } },
     include: {
@@ -50,7 +50,7 @@ export async function createReserva(data: {
 }
 
 export async function updateReservaStatus(
-  tenantId: string,
+  _tenantId: string,
   id: string,
   data: {
     status: ReservaStatus;
