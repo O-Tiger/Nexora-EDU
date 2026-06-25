@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
 import { getProfessorByUserId } from "@nexora/db/src/queries/professores";
+import { getTenantConfig } from "@nexora/db/src/queries/administracao";
 import { NotasGrid } from "@/components/secretaria/notas-grid";
 
 export const metadata: Metadata = { title: "Lançar notas" };
@@ -20,7 +21,7 @@ export default async function ProfNotasPage({ params }: { params: Promise<{ id: 
   const professor = await getProfessorByUserId(userId, tenantId);
   if (!professor) redirect("/unauthorized");
 
-  const [turma, myVinculos] = await Promise.all([
+  const [turma, myVinculos, tenantConfig] = await Promise.all([
     prisma.turma.findFirst({
       where: { id: turmaId, tenantId },
       include: {
@@ -35,7 +36,9 @@ export default async function ProfNotasPage({ params }: { params: Promise<{ id: 
       where: { tenantId, turmaId, professorId: professor.id },
       include: { disciplina: { select: { id: true, name: true, parentId: true } } },
     }),
+    getTenantConfig(tenantId),
   ]);
+  const periodos = tenantConfig?.periodos ?? 3;
 
   if (!turma) notFound();
   if (myVinculos.length === 0) redirect(`/prof/turmas/${turmaId}`);
@@ -70,6 +73,7 @@ export default async function ProfNotasPage({ params }: { params: Promise<{ id: 
         grades={grades.map((g) => ({ enrollmentId: g.enrollmentId, disciplinaId: g.disciplinaId, period: g.period, kind: g.kind, score: g.score }))}
         attendances={attendances.map((a) => ({ enrollmentId: a.enrollmentId, disciplinaId: a.disciplinaId, absences: a.absences }))}
         canManageDisciplinas={false}
+        periodos={periodos}
       />
     </div>
   );

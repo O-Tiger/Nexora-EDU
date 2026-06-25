@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FileText, Download } from "lucide-react";
 import { getFilhosFromSession, pickFilho } from "@/lib/responsavel";
 import { getBoletimData } from "@nexora/db/src/queries/pedagogico";
+import { getTenantConfig } from "@nexora/db/src/queries/administracao";
 import { prisma } from "@nexora/db";
 
 export const metadata: Metadata = { title: "Boletim" };
@@ -17,10 +18,12 @@ export default async function ResponsavelBoletimPage({
   const session = await auth();
   if (!session) redirect("/login");
 
-  const [filhos, sp] = await Promise.all([
+  const [filhos, sp, tenantConfig] = await Promise.all([
     getFilhosFromSession(session.user.id, session.user.activeTenantId),
     searchParams,
+    getTenantConfig(session.user.activeTenantId),
   ]);
+  const periodos = tenantConfig?.periodos ?? 3;
   const filho = pickFilho(filhos, sp.studentId);
 
   if (!filho?.turmaId) {
@@ -49,8 +52,9 @@ export default async function ResponsavelBoletimPage({
   }
 
   const aluno = boletim.students[0]!;
-  const periods = [1, 2, 3];
+  const periods = Array.from({ length: periodos }, (_, i) => i + 1);
   const kinds = ["AVA", "RECP"] as const;
+  const periodAbbr = periodos === 2 ? "S" : periodos === 4 ? "B" : "T";
 
   const pdfUrl = `/api/responsavel/boletim?turmaId=${filho.turmaId}${enrollment ? `&enrollmentId=${enrollment.id}` : ""}&format=pdf`;
 
@@ -82,7 +86,7 @@ export default async function ResponsavelBoletimPage({
               {periods.map((p) => (
                 kinds.map((k) => (
                   <th key={`${p}-${k}`} className="px-3 py-2 text-center text-xs font-semibold text-navy-600">
-                    {k === "AVA" ? `T${p}` : `Rec ${p}`}
+                    {k === "AVA" ? `${periodAbbr}${p}` : `Rec ${p}`}
                   </th>
                 ))
               ))}

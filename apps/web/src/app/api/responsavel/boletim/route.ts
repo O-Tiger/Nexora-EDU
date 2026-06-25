@@ -3,6 +3,7 @@ import { auth } from "@nexora/auth";
 import { getBoletimData } from "@nexora/db/src/queries/pedagogico";
 import { buildBoletimHtml, renderBoletim, type BoletimFormat } from "@/lib/boletim";
 import { getFilhosFromSession } from "@/lib/responsavel";
+import { getTenantConfig } from "@nexora/db/src/queries/administracao";
 import { BRAND } from "@nexora/ui";
 
 export const dynamic = "force-dynamic";
@@ -29,16 +30,20 @@ export async function GET(req: Request) {
   const pertenceAoFilho = filhos.some((f) => f.turmaId === turmaId);
   if (!pertenceAoFilho) return NextResponse.json({ error: "Não autorizado" }, { status: 403 });
 
-  const data = await getBoletimData(tenantId, turmaId, enrollmentId);
+  const [data, tenantConfig] = await Promise.all([
+    getBoletimData(tenantId, turmaId, enrollmentId),
+    getTenantConfig(tenantId),
+  ]);
   if (!data) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
   if (data.students.length === 0) return NextResponse.json({ error: "Sem dados de notas" }, { status: 400 });
 
+  const periodos = tenantConfig?.periodos ?? 3;
   const html = buildBoletimHtml(data, {
-    name: process.env.NEXT_PUBLIC_SCHOOL_NAME || BRAND.name,
-    ...(process.env.SCHOOL_CNPJ && { cnpj: process.env.SCHOOL_CNPJ }),
-    ...(process.env.SCHOOL_ADDRESS && { address: process.env.SCHOOL_ADDRESS }),
-    ...(process.env.SCHOOL_LOGO_URL && { logoUrl: process.env.SCHOOL_LOGO_URL }),
-  }, "avulsas");
+    name: tenantConfig?.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || BRAND.name,
+    ...(tenantConfig?.cnpj && { cnpj: tenantConfig.cnpj }),
+    ...(tenantConfig?.schoolAddress && { address: tenantConfig.schoolAddress }),
+    ...(tenantConfig?.logoUrl && { logoUrl: tenantConfig.logoUrl }),
+  }, "avulsas", periodos);
 
   let rendered;
   try {

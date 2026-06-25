@@ -13,6 +13,7 @@ type Config = {
   logoUrl?: string | null;
   emailDomain?: string | null;
   emailTemplate?: string | null;
+  periodos?: number | null;
 } | null;
 
 type Props = { tenantId: string; config: Config; emailPreview: string | null };
@@ -111,6 +112,26 @@ export function ConfigForm({ tenantId, config, emailPreview }: Props) {
             <input name="schoolAddress" defaultValue={config?.schoolAddress ?? ""} placeholder="Rua, número, cidade — UF"
               className="w-full rounded-lg border border-navy-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400" />
           </div>
+        </div>
+      </section>
+
+      {/* Sistema de avaliação */}
+      <section className="rounded-xl border border-navy-100 bg-white p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-navy-700">Sistema de avaliação</h2>
+        <p className="text-xs text-navy-500">
+          Define quantos períodos de avaliação existem no ano letivo. Afeta as colunas de notas e a estrutura do boletim.
+        </p>
+        <div className="max-w-xs">
+          <label className="block text-xs font-medium text-navy-600 mb-1">Período letivo</label>
+          <select
+            name="periodos"
+            defaultValue={config?.periodos ?? 3}
+            className="w-full rounded-lg border border-navy-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+          >
+            <option value={2}>Semestral (2 semestres)</option>
+            <option value={3}>Trimestral (3 trimestres)</option>
+            <option value={4}>Bimestral (4 bimestres)</option>
+          </select>
         </div>
       </section>
 

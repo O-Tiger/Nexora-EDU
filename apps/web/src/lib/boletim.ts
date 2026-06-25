@@ -13,10 +13,23 @@ export type BoletimFormat = "html" | "pdf" | "doc";
 /** "avulsas": frentes como linhas próprias · "media": consolida frentes na disciplina-mãe. */
 export type BoletimFrentes = "avulsas" | "media";
 
-const GRADE_KEYS = ["p1-AVA", "p2-AVA", "p3-AVA", "p0-RECP", "p0-FINAL"] as const;
+function gradeKeys(periodos: number): string[] {
+  return [
+    ...Array.from({ length: periodos }, (_, i) => `p${i + 1}-AVA`),
+    "p0-RECP",
+    "p0-FINAL",
+  ];
+}
+
+function periodLabel(i: number, periodos: number): string {
+  if (periodos === 2) return `${i}º Sem.`;
+  if (periodos === 4) return `${i}º Bim.`;
+  return `${i}º Trim.`;
+}
 
 /** Consolida as frentes na disciplina-mãe, fazendo a média de cada célula. */
-function consolidateRows(rows: BoletimDisciplinaRow[]): BoletimDisciplinaRow[] {
+function consolidateRows(rows: BoletimDisciplinaRow[], periodos: number): BoletimDisciplinaRow[] {
+  const keys = gradeKeys(periodos);
   const byId = new Set(rows.map((r) => r.disciplinaId));
   const frentesByParent = new Map<string, BoletimDisciplinaRow[]>();
   for (const r of rows) {
@@ -29,20 +42,19 @@ function consolidateRows(rows: BoletimDisciplinaRow[]): BoletimDisciplinaRow[] {
 
   const result: BoletimDisciplinaRow[] = [];
   for (const r of rows) {
-    if (r.isFrente) continue; // tratadas via mãe (ou como órfãs abaixo)
+    if (r.isFrente) continue;
     const frentes = frentesByParent.get(r.disciplinaId) ?? [];
     if (frentes.length === 0) { result.push(r); continue; }
 
     const sources = [r, ...frentes];
     const grades: Record<string, number | null> = {};
-    for (const k of GRADE_KEYS) {
+    for (const k of keys) {
       const vals = sources.map((s) => s.grades[k]).filter((v): v is number => typeof v === "number");
       grades[k] = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : null;
     }
     const absences = sources.reduce((a, s) => a + s.absences, 0);
     result.push({ ...r, grades, absences, isFrente: false });
   }
-  // Frentes órfãs (mãe não vinculada) — mantém como linha própria
   for (const r of rows) {
     if (r.isFrente && !(r.parentId && byId.has(r.parentId))) result.push(r);
   }
@@ -56,29 +68,21 @@ interface SchoolHeader {
   logoUrl?: string;
 }
 
-/**
- * Resumo de uma disciplina no boletim.
- * Colunas: 1ª/2ª/3ª AVA (trimestres) + REC (recuperação consolidada) + Prova Final.
- * - TOTAL PTS = soma das 3 avaliações presentes
- * - MÉDIA = média das avaliações; a recuperação só eleva (max); prova final entra na média
- *
- * NOTA: a fórmula é um default sensato — ajustável quando a regra exata da escola for definida.
- */
-function computeRowSummary(grades: Record<string, number | null>) {
-  const a1 = grades["p1-AVA"] ?? null;
-  const a2 = grades["p2-AVA"] ?? null;
-  const a3 = grades["p3-AVA"] ?? null;
+function computeRowSummary(grades: Record<string, number | null>, periodos: number) {
+  const avas = Array.from({ length: periodos }, (_, i) => grades[`p${i + 1}-AVA`] ?? null);
   const rec = grades["p0-RECP"] ?? null;
   const finalProva = grades["p0-FINAL"] ?? null;
 
-  const avas = [a1, a2, a3].filter((v): v is number => v != null);
-  const totalPts = avas.length > 0 ? avas.reduce((x, y) => x + y, 0) : null;
-  let media: number | null = avas.length > 0 ? avas.reduce((x, y) => x + y, 0) / avas.length : null;
-  if (media != null && rec != null) media = Math.max(media, rec); // recuperação só ajuda
+  const present = avas.filter((v): v is number => v != null);
+  const totalPts = present.length > 0 ? present.reduce((x, y) => x + y, 0) : null;
+  let media: number | null = present.length > 0 ? present.reduce((x, y) => x + y, 0) / present.length : null;
+  if (media != null && rec != null) media = Math.max(media, rec);
   if (media != null && finalProva != null) media = (media + finalProva) / 2;
 
   return {
-    a1, a2, a3, rec, finalProva,
+    avas,
+    rec,
+    finalProva,
     totalPts,
     media: media != null ? Math.round(media * 100) / 100 : null,
   };
@@ -92,18 +96,16 @@ function gradeClass(v: number | null): string {
   return "n-bad";
 }
 
-/** Resultado do aluno a partir das médias das disciplinas. */
-function studentResult(rows: BoletimStudent["rows"]): string {
-  const medias = rows.map((r) => computeRowSummary(r.grades).media).filter((m): m is number => m != null);
+function studentResult(rows: BoletimStudent["rows"], periodos: number): string {
+  const medias = rows.map((r) => computeRowSummary(r.grades, periodos).media).filter((m): m is number => m != null);
   if (medias.length === 0) return "Aluno Cursando";
   if (medias.some((m) => m < 5)) return "Reprovado";
   if (medias.some((m) => m < 7)) return "Em Recuperação";
   return "Aprovado";
 }
 
-/** Média geral do aluno (média das médias das disciplinas). */
-function overallMedia(rows: BoletimStudent["rows"]): number | null {
-  const medias = rows.map((r) => computeRowSummary(r.grades).media).filter((m): m is number => m != null);
+function overallMedia(rows: BoletimStudent["rows"], periodos: number): number | null {
+  const medias = rows.map((r) => computeRowSummary(r.grades, periodos).media).filter((m): m is number => m != null);
   if (medias.length === 0) return null;
   return Math.round((medias.reduce((a, b) => a + b, 0) / medias.length) * 100) / 100;
 }
@@ -121,20 +123,18 @@ function gradeCell(v: number | null, extraClass = ""): string {
   return `<td class="td-nota ${gradeClass(v)} ${extraClass}">${fmt(v)}</td>`;
 }
 
-function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes): string {
-  const rows = frentes === "media" ? consolidateRows(student.rows) : student.rows;
+function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes, periodos: number): string {
+  const rows = frentes === "media" ? consolidateRows(student.rows, periodos) : student.rows;
   const totalAbsences = rows.reduce((sum, r) => sum + r.absences, 0);
   const freqPct = Math.max(0, Math.round((1 - totalAbsences / DIAS_LETIVOS) * 100));
-  const media = overallMedia(rows);
+  const media = overallMedia(rows, periodos);
 
   const rowsHtml = rows.map((r) => {
-    const s = computeRowSummary(r.grades);
+    const s = computeRowSummary(r.grades, periodos);
     const discCls = r.isFrente ? "td-disc td-frente" : "td-disc";
     return `<tr>
       <td class="${discCls}">${esc(r.name)}</td>
-      ${gradeCell(s.a1)}
-      ${gradeCell(s.a2)}
-      ${gradeCell(s.a3)}
+      ${s.avas.map((v) => gradeCell(v)).join("")}
       ${gradeCell(s.rec)}
       <td class="td-num">${s.totalPts != null ? fmt(s.totalPts) : ""}</td>
       ${gradeCell(s.finalProva)}
@@ -182,9 +182,7 @@ function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolH
       <thead>
         <tr>
           <th class="th-disc">DISCIPLINAS</th>
-          <th>1ª AVA</th>
-          <th>2ª AVA</th>
-          <th>3ª AVA</th>
+          ${Array.from({ length: periodos }, (_, i) => `<th>${["1ª","2ª","3ª","4ª"][i]} AVA<br><span style="font-weight:normal;font-size:8px">${periodLabel(i + 1, periodos)}</span></th>`).join("")}
           <th>REC</th>
           <th>TOTAL PTS</th>
           <th>PROVA FINAL</th>
@@ -197,7 +195,7 @@ function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolH
 
     <div class="bol-rodape">
       <div class="bol-rodape-resultado">
-        <strong>RESULTADO FINAL:</strong> ${studentResult(rows)}
+        <strong>RESULTADO FINAL:</strong> ${studentResult(rows, periodos)}
         &nbsp;&nbsp;&nbsp;
         <strong>FALTAS ACUMULADAS:</strong> ${totalAbsences}
         &nbsp;&nbsp;&nbsp;
@@ -260,8 +258,8 @@ const BOL_CSS = `
   .bol-rodape-media { font-size: 12px; font-weight: bold; }
 `;
 
-export function buildBoletimHtml(data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes = "avulsas"): string {
-  const pages = data.students.map((s) => studentCard(s, data, school, frentes)).join('<div class="page-break"></div>');
+export function buildBoletimHtml(data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes = "avulsas", periodos = 3): string {
+  const pages = data.students.map((s) => studentCard(s, data, school, frentes, periodos)).join('<div class="page-break"></div>');
   return `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8"><style>${BOL_CSS}</style></head>
 <body>${pages}</body></html>`;

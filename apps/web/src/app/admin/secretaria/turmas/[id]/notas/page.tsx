@@ -6,6 +6,7 @@ import { ArrowLeft, FileText } from "lucide-react";
 import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
 import { getDisciplinas, getTurmaDisciplinas, getEnrollmentFrentes } from "@nexora/db/src/queries/pedagogico";
+import { getTenantConfig } from "@nexora/db/src/queries/administracao";
 import { NotasGrid } from "@/components/secretaria/notas-grid";
 import { ItinerarioPanel } from "@/components/secretaria/itinerario-panel";
 
@@ -29,10 +30,12 @@ export default async function NotasPage({ params }: { params: Promise<{ id: stri
   });
   if (!turma) notFound();
 
-  const [allDisciplinas, assigned] = await Promise.all([
+  const [allDisciplinas, assigned, tenantConfig] = await Promise.all([
     getDisciplinas(tenantId),
     getTurmaDisciplinas(tenantId, turmaId),
+    getTenantConfig(tenantId),
   ]);
+  const periodos = tenantConfig?.periodos ?? 3;
 
   const enrollmentIds = turma.enrollments.map((e) => e.id);
   const [grades, attendances] = await Promise.all([
@@ -106,6 +109,7 @@ export default async function NotasPage({ params }: { params: Promise<{ id: stri
         assignedDisciplinas={assignedFlat.map((d) => ({ id: d.id, name: d.name }))}
         grades={grades.map((g) => ({ enrollmentId: g.enrollmentId, disciplinaId: g.disciplinaId, period: g.period, kind: g.kind, score: g.score }))}
         attendances={attendances.map((a) => ({ enrollmentId: a.enrollmentId, disciplinaId: a.disciplinaId, absences: a.absences }))}
+        periodos={periodos}
         itinerarioFrenteOf={itinerarioFrenteOf}
         enrollmentFrentes={enrollmentFrentesRows}
       />

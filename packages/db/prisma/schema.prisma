@@ -1209,6 +1209,9 @@ model TenantConfig {
   /// Exemplo: "{primeiroNome}.{primeiroSobrenome}"
   emailTemplate String?
 
+  /// Sistema de avaliação: 2 = semestral, 3 = trimestral, 4 = bimestral
+  periodos      Int     @default(3)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

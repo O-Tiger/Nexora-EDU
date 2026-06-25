@@ -91,7 +91,7 @@ export async function setTurmaDisciplinasAction(turmaId: string, disciplinaIds: 
 const GradeSchema = z.object({
   enrollmentId: z.string().cuid(),
   disciplinaId: z.string().cuid(),
-  period: z.number().int().min(0).max(3),
+  period: z.number().int().min(0).max(4),
   kind: z.enum(["AVA", "RECP", "FINAL"]),
   score: z.number().min(0).max(10).nullable(),
 });

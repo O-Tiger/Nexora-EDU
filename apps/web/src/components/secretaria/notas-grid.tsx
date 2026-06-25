@@ -22,24 +22,34 @@ interface Props {
   grades: GradeCell[];
   attendances: AttCell[];
   canManageDisciplinas?: boolean;
+  /** 2 = semestral, 3 = trimestral, 4 = bimestral */
+  periodos?: number;
   /** frenteId → parentId, only for frentes of isItinerario parents */
   itinerarioFrenteOf?: Record<string, string>;
   /** enrollment frente assignments for itinerário disciplines */
   enrollmentFrentes?: EnrollmentFrenteRow[];
 }
 
-// Colunas de nota: 1ª/2ª/3ª avaliação (trimestres) + recuperação única + prova final
-const COLUMNS: { key: string; label: string; period: number; kind: GradeKind }[] = [
-  { key: "1-AVA", label: "1ª AVA", period: 1, kind: "AVA" },
-  { key: "2-AVA", label: "2ª AVA", period: 2, kind: "AVA" },
-  { key: "3-AVA", label: "3ª AVA", period: 3, kind: "AVA" },
-  { key: "0-RECP", label: "REC", period: 0, kind: "RECP" },
-  { key: "0-FINAL", label: "Prova Final", period: 0, kind: "FINAL" },
-];
+function buildColumns(periodos: number): { key: string; label: string; period: number; kind: GradeKind }[] {
+  const ordinals = ["1ª", "2ª", "3ª", "4ª"];
+  const ava = Array.from({ length: periodos }, (_, i) => ({
+    key: `${i + 1}-AVA`,
+    label: `${ordinals[i]} AVA`,
+    period: i + 1,
+    kind: "AVA" as GradeKind,
+  }));
+  return [
+    ...ava,
+    { key: "0-RECP", label: "REC", period: 0, kind: "RECP" as GradeKind },
+    { key: "0-FINAL", label: "Prova Final", period: 0, kind: "FINAL" as GradeKind },
+  ];
+}
 
 export function NotasGrid(props: Props) {
   const { turmaId, students, allDisciplinas, assignedDisciplinas, canManageDisciplinas = true,
-    itinerarioFrenteOf = {}, enrollmentFrentes = [] } = props;
+    periodos = 3, itinerarioFrenteOf = {}, enrollmentFrentes = [] } = props;
+
+  const COLUMNS = useMemo(() => buildColumns(periodos), [periodos]);
 
   // Map `${enrollmentId}|${parentId}` → frenteId for itinerário lookup
   const efMap = new Map<string, string>();
