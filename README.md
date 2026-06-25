@@ -1,8 +1,22 @@
 # Nexora EDU
 
-Plataforma EAD multi-tenant para instituições de ensino. Cada instituição (tenant) tem seus próprios cursos, alunos e configurações — completamente isolados.
+Plataforma de gestão educacional multi-tenant para instituições de ensino. Cada instituição tem seus próprios dados, configurações e portais — completamente isolados na mesma infraestrutura.
 
 [![CI](https://github.com/O-Tiger/Nexora-EDU/actions/workflows/ci.yml/badge.svg)](https://github.com/O-Tiger/Nexora-EDU/actions/workflows/ci.yml)
+[![License: ELv2](https://img.shields.io/badge/License-Elastic_v2-orange.svg)](LICENSE)
+
+---
+
+## Visão geral
+
+Nexora EDU cobre dois eixos principais:
+
+| Eixo | O que resolve |
+|---|---|
+| **EAD** | Cursos, módulos, aulas (vídeo / PDF / texto / ao vivo), progresso, certificados, avaliações com autocorreção |
+| **Secretaria Escolar K-12** | Turmas, matrículas, grade de horários, boletim trimestral, diário de classe, frequência, financeiro |
+
+Cada instituição (tenant) acessa o sistema pelo mesmo domínio com contexto isolado via JWT multi-tenant.
 
 ---
 
@@ -18,7 +32,7 @@ Plataforma EAD multi-tenant para instituições de ensino. Cada instituição (t
 | E-mail | Resend + React Email |
 | Monorepo | Turborepo + npm workspaces |
 | UI | Tailwind CSS + shadcn/ui |
-| Erros | Sentry |
+| Monitoramento | Sentry |
 
 ---
 
@@ -26,140 +40,126 @@ Plataforma EAD multi-tenant para instituições de ensino. Cada instituição (t
 
 ```
 apps/
-  web/               # Next.js — painéis admin, aluno e professor
+  web/               # Next.js — portais admin, professor, responsável e aluno
 packages/
   auth/              # NextAuth config, middleware por role, rate limit
   db/                # Schema Prisma, migrations, seed, queries
-  emails/            # Templates React Email (matrícula, expiração, certificado)
-  notifications/     # Contrato WhatsApp via Digisac (Fase 2)
+  emails/            # Templates React Email
+  notifications/     # Integração WhatsApp via Digisac
   ui/                # Componentes base + tokens de design
   validators/        # Schemas Zod compartilhados
 ```
 
 ---
 
-## Pré-requisitos
-
-- Node.js ≥ 20
-- npm ≥ 10
-- Docker (para o banco e Redis em dev)
-
----
-
-## Primeiros passos
+## Início rápido
 
 ```bash
-# 1. Clonar e instalar
+# 1. Clonar e instalar dependências
 git clone https://github.com/O-Tiger/Nexora-EDU.git
 cd Nexora-EDU
 npm install
 
-# 2. Variáveis de ambiente
+# 2. Configurar variáveis de ambiente
 cp .env.example .env.local
-# Edite .env.local com suas credenciais (veja a seção abaixo)
+# Edite .env.local (veja docs/setup/environment-variables.md)
 
 # 3. Subir banco e Redis
 docker compose -f docker-compose.dev.yml up -d
 
-# 4. Migrations + seed
+# 4. Aplicar migrations e popular banco
 npm run db:migrate
 npm run db:seed
 
-# 5. Gerar Prisma Client
-cd packages/db && npx prisma generate && cd ../..
-
-# 6. Rodar em dev
-npm run dev          # Turbopack
-npm run dev:webpack  # Webpack (fallback)
+# 5. Rodar em desenvolvimento
+npm run dev
 ```
 
 Acesse `http://localhost:3000`.
 
+Credenciais de seed: `admin.a@nexora.edu` / `nexora@admin`
+
+Documentação completa de setup: [docs/setup/local-development.md](docs/setup/local-development.md)
+
 ---
 
-## Variáveis de ambiente
+## Portais
 
-Todas as variáveis estão documentadas em `.env.example`. As obrigatórias para dev local:
+| Portal | Rota | Acesso |
+|---|---|---|
+| Administrador | `/admin` | ADMINISTRATOR, OWNER |
+| Professor | `/prof` | PROFESSOR (com cadastro interno vinculado) |
+| Responsável | `/responsavel` | RESPONSIBLE |
+| Aluno | `/aluno` | STUDENT |
 
-| Variável | Descrição |
+---
+
+## Documentação
+
+| Documento | Descrição |
 |---|---|
-| `DATABASE_URL` | PostgreSQL — gerado pelo Docker: `postgresql://postgres:dev@localhost:5432/nexora_dev` |
-| `NEXTAUTH_SECRET` | Chave JWT — gere com `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | `http://localhost:3000` em dev |
-| `UPSTASH_REDIS_URL` | Redis local: `redis://localhost:6379` |
-| `UPSTASH_REDIS_TOKEN` | Qualquer string em dev local |
+| [Setup local](docs/setup/local-development.md) | Pré-requisitos, Docker, seed, dev server |
+| [Variáveis de ambiente](docs/setup/environment-variables.md) | Todas as env vars documentadas |
+| [Banco de dados](docs/setup/database.md) | Migrations, reset, seed |
+| [Arquitetura](docs/architecture/overview.md) | Visão geral do sistema |
+| [Modelo de dados](docs/architecture/data-model.md) | Schema Prisma e relações |
+| [Autenticação](docs/architecture/auth.md) | JWT, roles, multi-tenant |
+| [Deploy — Railway](docs/deploy/railway.md) | Deploy e variáveis de produção |
+| [Release workflow](docs/deploy/release-workflow.md) | SemVer, tags, CHANGELOG |
+| [Boletim](docs/features/boletim.md) | Engine de geração de boletim |
+| [Grade de horários](docs/features/horario.md) | Configuração e PDF |
+| [Diário de classe](docs/features/diario-de-classe.md) | Registro de aulas e chamada |
+| [Itinerário Formativo](docs/features/itinerario-formativo.md) | Trilhas por aluno |
+| [Financeiro](docs/features/financeiro.md) | Mensalidades e status de pagamento |
+| [Portal Professor](docs/features/portal-professor.md) | Notas e diário pelo portal /prof |
+| [Portal Responsável](docs/features/portal-responsavel.md) | Boletim, frequência e mensalidades |
 
-As demais (R2, Resend, Sentry, Digisac, Omie, Groq) são opcionais em dev — o sistema usa fallbacks locais quando ausentes.
+### Decisões de arquitetura (ADRs)
 
----
-
-## Usuários do seed
-
-| E-mail | Senha | Role | Tenant |
-|---|---|---|---|
-| `superadmin@nexora.edu` | `nexora@superadmin` | SUPER_ADMIN | — |
-| `admin.a@nexora.edu` | `nexora@admin` | ADMIN | inst_a |
-| `admin.b@nexora.edu` | `nexora@admin` | ADMIN | inst_b |
-| `prof.a@nexora.edu` | `nexora@prof` | PROFESSOR | inst_a |
-| `aluno1@nexora.edu` | `nexora@aluno` | ALUNO | inst_a |
+- [ADR-001](docs/architecture/ADR-001.md) — Multi-tenancy por coluna
+- [ADR-002](docs/architecture/ADR-002.md) — Autenticação com NextAuth v5 + Argon2
+- [ADR-003](docs/architecture/ADR-003.md) — Page Builder com slugs customizados (deferido)
 
 ---
 
 ## Comandos úteis
 
 ```bash
-npm run typecheck        # TypeScript em todos os pacotes
-npm run lint             # ESLint no apps/web
-npm run test             # Vitest
+npm run dev              # Dev server (Turbopack)
 npm run build            # Build de produção
-npm run db:studio        # Prisma Studio
+npm run typecheck        # TypeScript em todos os pacotes
+npm run lint             # ESLint
+npm run test             # Vitest
 npm run db:migrate       # Aplicar migrations pendentes
 npm run db:seed          # Popular banco com dados de dev
+npm run db:studio        # Abrir Prisma Studio
 ```
 
 ---
 
-## O que está implementado
+## Contribuindo
 
-### Fase 0 — Infraestrutura
-- Monorepo Turborepo com workspaces, Docker dev (PostgreSQL + Redis), CI/CD
-- Auth multi-tenant: NextAuth v5, Argon2, JWT com `tenantId` + `role`, rate limit de login (5 tentativas/15 min)
-- Schema Prisma completo com multi-tenancy por coluna (`tenantId`)
-- Componentes base e tokens de design (navy `#1A3A5C`, teal `#0D9488`)
+Veja [CONTRIBUTING.md](CONTRIBUTING.md) para o guia completo de contribuição.
 
-### Fase 1 — MVP EAD
-- **Painel admin:** cursos (CRUD, drag-and-drop de módulos/aulas), alunos, matrículas, importação de cursos `.imscc` (formato NeoLMS/Common Cartridge)
-- **Painel aluno:** player de aulas (vídeo, PDF, texto rico, link externo, ao vivo), progresso com cache Redis
-- **Certificados:** geração com Puppeteer, armazenamento no R2, página pública de validação por código
-- **Storage:** Cloudflare R2 com presigned URLs (15 min download / 5 min upload) + fallback local em dev
-- **E-mails transacionais:** matrícula confirmada, expiração próxima, certificado emitido (Resend + React Email)
-- **Cron:** endpoint para expirar matrículas vencidas (`POST /api/cron/enrollments`)
-
-### Fase 2 — Em andamento
-- ✅ **Page Builder:** editor visual drag-and-drop, 7 tipos de bloco, versionamento (10 versões + rollback), auditoria de publicações, `PageRenderer` server-side, rota pública `/p/[pageType]`
-- ✅ **Avaliações:** questões de múltipla escolha, V/F e dissertativa; fórmula de nota configurável com `mathjs` (nunca `eval`); auto-correção de objetivas; correção manual de dissertativas; upload de entregas com validação por magic bytes
-- ⬜ Comunicação + Digisac WhatsApp
-- ⬜ LGPD (exportação de dados pessoais)
-- ⬜ Aulas ao vivo (Zoom/Meet)
-- ⬜ Omie ERP
-- ⬜ PWA + i18n + WCAG 2.1 AA
+Resumo:
+1. Fork + branch a partir de `dev`
+2. Siga o padrão de commits [Conventional Commits](https://www.conventionalcommits.org/)
+3. `npm run typecheck && npm run lint` devem passar
+4. Abra PR para `dev` — nunca direto para `main`
 
 ---
 
-## Branching
+## Segurança
 
-| Branch | Uso |
-|---|---|
-| `main` | Produção — merge via PR após CI verde |
-| `dev` | Integração — features mergeiam aqui primeiro |
-| `feat/*` | Features individuais |
-| `fix/*` | Correções |
-| `hotfix/*` | Correções urgentes de produção (branch de `main`) |
+Para reportar vulnerabilidades, veja [SECURITY.md](SECURITY.md).
 
 ---
 
-## Arquitetura
+## Licença
 
-Decisões documentadas em [`docs/architecture/`](docs/architecture/):
-- [ADR-001](docs/architecture/ADR-001.md) — Multi-tenancy por coluna vs. schema separado
-- [ADR-002](docs/architecture/ADR-002.md) — NextAuth v5 + Argon2 como solução de autenticação
+Nexora EDU é distribuído sob a [Elastic License 2.0](LICENSE).
+
+Uso pessoal e educacional: **gratuito**.
+Uso comercial (hospedagem como serviço, revenda): **requer autorização do autor**.
+
+© 2026 Paulo Schemidt (O-Tiger). Todos os direitos reservados.
