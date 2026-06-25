@@ -3,13 +3,15 @@ import { redirect } from "next/navigation";
 import { prisma } from "@nexora/db";
 import { StudentSidebar } from "@/components/aluno/student-sidebar";
 import { ChatbotWidget } from "@/components/communication/chatbot-widget";
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
+import { getOnboardingStatus } from "@/lib/onboarding";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session) redirect("/login");
 
   // LGPD: require consent before accessing the student area
-  if (session.user.role === "ALUNO") {
+  if (session.user.role === "STUDENT") {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { consentedAt: true, anonymizedAt: true },
@@ -18,6 +20,9 @@ export default async function StudentLayout({ children }: { children: React.Reac
     if (!user?.consentedAt) redirect("/consentimento" as never);
   }
 
+  const onboarding = await getOnboardingStatus(session.user.id, "aluno");
+  const showTour = !onboarding.completed && !onboarding.skipped;
+
   return (
     <div className="flex min-h-screen bg-navy-50">
       <StudentSidebar user={{ name: session.user.name, tenantId: session.user.activeTenantId }} />
@@ -25,6 +30,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         <div className="mx-auto max-w-5xl p-6 pt-16 lg:pt-6">{children}</div>
       </main>
       <ChatbotWidget />
+      <OnboardingTour tourId="aluno" initialVisible={showTour} />
     </div>
   );
 }

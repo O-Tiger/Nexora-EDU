@@ -16,118 +16,81 @@ async function main() {
 
   const superAdmin = await prisma.user.upsert({
     where: { email: "superadmin@nexora.edu" },
-    update: {},
-    create: {
-      email: "superadmin@nexora.edu",
-      passwordHash: superAdminHash,
-      name: "Super Admin",
-    },
+    update: { passwordHash: superAdminHash },
+    create: { email: "superadmin@nexora.edu", passwordHash: superAdminHash, name: "Super Admin" },
   });
 
   const adminA = await prisma.user.upsert({
     where: { email: "admin.a@nexora.edu" },
-    update: {},
-    create: {
-      email: "admin.a@nexora.edu",
-      passwordHash: adminHash,
-      name: "Admin Faculdade",
-    },
+    update: { passwordHash: adminHash },
+    create: { email: "admin.a@nexora.edu", passwordHash: adminHash, name: "Admin Faculdade" },
   });
 
   const adminB = await prisma.user.upsert({
     where: { email: "admin.b@nexora.edu" },
-    update: {},
-    create: {
-      email: "admin.b@nexora.edu",
-      passwordHash: adminHash,
-      name: "Admin Colégio",
-    },
+    update: { passwordHash: adminHash },
+    create: { email: "admin.b@nexora.edu", passwordHash: adminHash, name: "Admin Colégio" },
   });
 
   const profA = await prisma.user.upsert({
     where: { email: "prof.a@nexora.edu" },
-    update: {},
-    create: {
-      email: "prof.a@nexora.edu",
-      passwordHash: profHash,
-      name: "Prof. Ana Lima",
-    },
+    update: { passwordHash: profHash },
+    create: { email: "prof.a@nexora.edu", passwordHash: profHash, name: "Prof. Ana Lima" },
   });
 
   const profB = await prisma.user.upsert({
     where: { email: "prof.b@nexora.edu" },
-    update: {},
-    create: {
-      email: "prof.b@nexora.edu",
-      passwordHash: profHash,
-      name: "Prof. Bruno Melo",
-    },
+    update: { passwordHash: profHash },
+    create: { email: "prof.b@nexora.edu", passwordHash: profHash, name: "Prof. Bruno Melo" },
   });
 
   const aluno1 = await prisma.user.upsert({
     where: { email: "aluno1@nexora.edu" },
-    update: {},
-    create: {
-      email: "aluno1@nexora.edu",
-      passwordHash: alunoHash,
-      name: "Carlos Souza",
-    },
+    update: { passwordHash: alunoHash },
+    create: { email: "aluno1@nexora.edu", passwordHash: alunoHash, name: "Carlos Souza" },
   });
 
   const aluno2 = await prisma.user.upsert({
     where: { email: "aluno2@nexora.edu" },
-    update: {},
-    create: {
-      email: "aluno2@nexora.edu",
-      passwordHash: alunoHash,
-      name: "Diana Costa",
-    },
+    update: { passwordHash: alunoHash },
+    create: { email: "aluno2@nexora.edu", passwordHash: alunoHash, name: "Diana Costa" },
   });
 
   const aluno3 = await prisma.user.upsert({
     where: { email: "aluno3@nexora.edu" },
-    update: {},
-    create: {
-      email: "aluno3@nexora.edu",
-      passwordHash: alunoHash,
-      name: "Eduardo Ferreira",
-    },
+    update: { passwordHash: alunoHash },
+    create: { email: "aluno3@nexora.edu", passwordHash: alunoHash, name: "Eduardo Ferreira" },
   });
 
-  // Professor do Colégio (Inst.B) que também é aluno na Faculdade (Inst.A)
   const crossUser = await prisma.user.upsert({
     where: { email: "cross@nexora.edu" },
-    update: {},
-    create: {
-      email: "cross@nexora.edu",
-      passwordHash: crossHash,
-      name: "Fernanda Dias",
-    },
+    update: { passwordHash: crossHash },
+    create: { email: "cross@nexora.edu", passwordHash: crossHash, name: "Fernanda Dias" },
   });
 
   // ─── Vínculos TenantMembership ────────────────────────────────────────────
 
   const memberships = [
     // Super admin: acesso a ambos os tenants
-    { userId: superAdmin.id, tenantId: "inst_a", role: Role.SUPER_ADMIN },
-    { userId: superAdmin.id, tenantId: "inst_b", role: Role.SUPER_ADMIN },
+    { userId: superAdmin.id, tenantId: "inst_a", role: Role.OWNER },
+    { userId: superAdmin.id, tenantId: "inst_b", role: Role.OWNER },
 
     // Admins
-    { userId: adminA.id, tenantId: "inst_a", role: Role.ADMIN },
-    { userId: adminB.id, tenantId: "inst_b", role: Role.ADMIN },
+    { userId: adminA.id, tenantId: "inst_a", role: Role.ADMINISTRATOR },
+    { userId: adminB.id, tenantId: "inst_b", role: Role.ADMINISTRATOR },
 
     // Professores
     { userId: profA.id, tenantId: "inst_a", role: Role.PROFESSOR },
     { userId: profB.id, tenantId: "inst_b", role: Role.PROFESSOR },
 
     // Alunos na Inst.A
-    { userId: aluno1.id, tenantId: "inst_a", role: Role.ALUNO },
-    { userId: aluno2.id, tenantId: "inst_a", role: Role.ALUNO },
-    { userId: aluno3.id, tenantId: "inst_a", role: Role.ALUNO },
+    { userId: aluno1.id, tenantId: "inst_a", role: Role.STUDENT },
+    { userId: aluno2.id, tenantId: "inst_a", role: Role.STUDENT },
+    { userId: aluno3.id, tenantId: "inst_a", role: Role.STUDENT },
 
     // Usuário cross-tenant: professor no Colégio + aluno na Faculdade
     { userId: crossUser.id, tenantId: "inst_b", role: Role.PROFESSOR },
-    { userId: crossUser.id, tenantId: "inst_a", role: Role.ALUNO },
+    { userId: crossUser.id, tenantId: "inst_a", role: Role.STUDENT },
   ];
 
   for (const m of memberships) {
@@ -211,7 +174,7 @@ async function main() {
   console.log("✅ Seed concluído.");
   console.log("");
   console.log("Credenciais de acesso:");
-  console.log("  superadmin@nexora.edu  /  nexora@superadmin  (SUPER_ADMIN em inst_a + inst_b)");
+  console.log("  superadmin@nexora.edu  /  nexora@superadmin  (OWNER em inst_a + inst_b)");
   console.log("  admin.a@nexora.edu     /  nexora@admin       (ADMIN em inst_a)");
   console.log("  admin.b@nexora.edu     /  nexora@admin       (ADMIN em inst_b)");
   console.log("  prof.a@nexora.edu      /  nexora@prof        (PROFESSOR em inst_a)");

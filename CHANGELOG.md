@@ -9,6 +9,53 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Changed (Fase 3 — Professores como cadastro interno)
+- `packages/db`: novo model `Professor` (nome, email/telefone opcionais, sem login/senha); `TurmaDisciplina.professorId` re-aponta de `User` para `Professor` + migration
+- Professores agora são **cadastrados/excluídos por admins** (ADMIN/SUPER_ADMIN/COORDENADOR) em `/admin/secretaria/professores` — não se auto-cadastram e não autenticam
+- `ProfessoresManager`: formulário de cadastro + exclusão (remove vínculos) + lista com vínculos por turma/disciplina
+- Ano letivo: campos de data agora em **dd/mm/aaaa** com máscara e validação (`AnoLetivoForm`)
+
+### Added (Fase 3 — Grade de horários, professores e cores)
+- `packages/db`: `Disciplina.color`, `TurmaDisciplina.professorId` (FK User), `Turma.horarioConfig` (Json) + migration
+- **Grade visual** estilo grade escolar: horários por linha (início/fim), cores por disciplina, professor por célula; preview inline (iframe) + **download PDF** (paisagem) em `/api/secretaria/horario`
+- **Cor por disciplina**: color picker no `DisciplinasManager` (raiz e frentes), refletida na grade
+- **Professor por disciplina da turma**: atribuição na página de horário (`ProfessorAssign`); `setTurmaDisciplinas` preserva vínculos de professor ao alterar disciplinas
+- **Aba Professores** (`/admin/secretaria/professores`): lista professores do tenant e seus vínculos (turma · disciplina)
+- **Ordenação de disciplinas**: por nome (A–Z / Z–A) e por nº de frentes (mais/menos) no `DisciplinasManager`
+
+### Added (Fase 3 — Diário de classe)
+- `packages/db`: models `RegistroAula` (turma + disciplina + data + nº de aulas + conteúdo + observações) e `PresencaAluno` (faltas/justificadas por aluno) + migration
+- **Presença parcial em geminadas**: cada registro pode ter N aulas; o aluno pode faltar a algumas (0…N) — faltas e justificadas contadas por aula
+- `packages/db/src/queries/diario.ts`: CRUD de registros e `getFaltasFromDiario()` (soma faltas por aluno/disciplina; justificada não conta; só persiste alunos com falta)
+- `apps/web`: `/admin/secretaria/turmas/[id]/diario` — registro de aula com conteúdo ministrado + chamada com steppers de faltas/justificadas por aluno, "todos presentes", lista de registros e exclusão
+- **Boletim**: quando a turma tem diário lançado, as faltas vêm dele (default 0); senão, fallback à falta manual (`Attendance`)
+- `apps/web`: link "Diário" no detalhe da turma
+
+### Added (Fase 3 — Pedagógico & Certificados)
+- `packages/db`: models `Disciplina` (auto-relação `parentId` = frente), `TurmaDisciplina`, `Grade`, `Attendance`, `CertificateTemplate` + enum `GradeKind` + migrations
+- **Disciplinas & frentes**: CRUD em `/admin/secretaria/disciplinas` — disciplinas com sub-divisões graduadas separadamente (Matemática 1/2/3)
+- **Notas & frequência**: atribuição de disciplinas à turma + grade de lançamento com autosave (AVA/RECP por trimestre + prova final + faltas) em `/admin/secretaria/turmas/[id]/notas`
+- **Gerador de boletim**: engine modelado no padrão trimestral (total, prova final, média, resultado, % freq); geração em **PDF** (puppeteer), **HTML** e **Word (.doc)** por turma inteira ou aluno individual em `/admin/secretaria/boletins`
+- **Gerador de certificado customizável** (Faculdade): `CertificateTemplate` por tenant — instituição, subtítulo/credenciamento, título, corpo com `{{placeholders}}`, até 4 assinaturas, logo, cidade, cor de destaque; editor em `/admin/certificados` com preview HTML e PDF de exemplo; render usado no download do aluno (PDF obrigatório)
+- **Workspace switcher**: AdminSidebar separa Faculdade (EAD) e Secretaria Escolar via dropdown
+- `apps/web`: botão de exclusão de turma com guarda de alunos matriculados
+- `fix(import)`: materiais de cartuchos `.imscc` (container plano) redistribuídos aos módulos corretos pelo número no título
+
+### Added (Fase 3 — Secretaria)
+- `packages/db`: models `Unidade`, `AnoLetivo`, `Turma`, `TurmaEnrollment`, `Guardian` + enums `Etapa` (EI/EF1/EF2/EM), `Periodo`, `UnidadeGender`, `GuardianRelationship`, `TurmaEnrollmentStatus` + migration manual
+- `packages/validators`: schemas Zod `UnidadeSchema`, `AnoLetivoSchema`, `TurmaSchema`, `TurmaEnrollmentSchema`, `GuardianSchema`; `buildTurmaCode()` para geração de código configurável por escola (ex: `EFAI3ACOL`, `EF3A`); `ETAPA_LABELS`, `ETAPA_ANO_RANGE`
+- `packages/db/src/queries/secretaria.ts`: queries CRUD completas (unidades, anos letivos, turmas, matrículas K-12, responsáveis, overview stats)
+- `apps/web/src/actions/secretaria.ts`: server actions com validação, auditlog e revalidação de paths
+- `apps/web/src/app/admin/secretaria`: página overview com cards de stats, lista de anos letivos com controle de status (PLANEJADO → EM_ANDAMENTO → ENCERRADO), lista de unidades
+- `apps/web/src/app/admin/secretaria/unidades/[id]`: turmas agrupadas por etapa, filtro por ano letivo, capacidade ocupada/total, link para detalhe da turma
+- `apps/web/src/app/admin/secretaria/turmas/[id]`: lista de alunos matriculados, matrícula de novos alunos com busca, cancelamento de matrícula via modal
+- `apps/web/src/app/admin/secretaria/alunos/[studentId]`: ficha do aluno — dados pessoais, responsáveis (CRUD), histórico de turmas por ano letivo
+- `AdminSidebar`: link "Secretaria" adicionado
+
+## [v0.2.0] - 2026-06-12
+
+> Primeiro release em `main` — Fases 0, 1 e 2 (MVP EAD completo + integrações, LGPD e acessibilidade).
+
 ### Added (Fase 2 — WCAG / PWA / i18n)
 - **WCAG 2.1 AA**: skip-to-content link em todas as páginas (SC 2.4.1); `id="main-content"` + `tabIndex={-1}` em `<main>`; `aria-label` em `<aside>` e `<nav>`; `aria-current="page"` nos links de navegação ativos; `aria-hidden="true"` em ícones decorativos; `focus-visible` global com anel teal; `prefers-reduced-motion` desativa animações; `focus-ring` utility aplicado aos links de navegação
 - **PWA**: `public/manifest.webmanifest` (name, icons 192/512, start_url, display standalone, shortcuts); meta tags `theme-color`, `viewport`, `apple-mobile-web-app-capable` no root layout via `Viewport` export; `@ducanh2912/next-pwa` integrado ao `next.config.ts` (desabilitado em dev, Workbox em produção)

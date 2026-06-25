@@ -1,4 +1,5 @@
 import { prisma } from "@nexora/db";
+import { updateMensalidadeOmie } from "@nexora/db/src/queries/financeiro";
 
 type OmieCallResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -162,6 +163,57 @@ export async function syncEnrollmentToOmie(params: {
     await prisma.omieSync.update({
       where: { enrollmentId: params.enrollmentId },
       data: { status: "FAILED", errorMessage: String(err) },
+    }).catch(() => undefined);
+  }
+}
+
+/**
+ * Syncs a mensalidade (K-12 tuition) to Omie: upsert client + create receivable.
+ * Fire-and-forget safe (never throws). Updates Mensalidade.omieSyncStatus.
+ */
+export async function syncMensalidadeToOmie(params: {
+  mensalidadeId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userCpf?: string | null;
+  userPhone?: string | null;
+  valorCents: number;
+  vencimento: Date;
+  descricao: string; // ex: "Mensalidade Fev/2026 - Turma EFAI3A"
+}): Promise<void> {
+  try {
+    const omieClientId = await upsertOmieClient({
+      integrationId: params.userId,
+      name: params.userName,
+      email: params.userEmail,
+      ...(params.userCpf != null && { cpf: params.userCpf }),
+      ...(params.userPhone != null && { phone: params.userPhone }),
+    });
+
+    if (!omieClientId) {
+      await updateMensalidadeOmie(params.mensalidadeId, { omieSyncStatus: "FAILED", omieError: "upsertClient returned null" });
+      return;
+    }
+
+    const dueDateStr = params.vencimento.toLocaleDateString("pt-BR");
+    const omieReceivableId = await createOmieReceivable({
+      enrollmentId: params.mensalidadeId,
+      omieClientId,
+      courseName: params.descricao,
+      amount: params.valorCents,
+      dueDate: dueDateStr,
+    });
+
+    const syncData = omieReceivableId
+      ? { omieClientId: String(omieClientId), omieReceivableId: String(omieReceivableId), omieSyncStatus: "SYNCED" as const, omieError: null }
+      : { omieClientId: String(omieClientId), omieSyncStatus: "FAILED" as const, omieError: "createReceivable returned null" };
+    await updateMensalidadeOmie(params.mensalidadeId, syncData);
+  } catch (err) {
+    console.error(`[omie.syncMensalidade] Unexpected error: ${err}`);
+    await updateMensalidadeOmie(params.mensalidadeId, {
+      omieSyncStatus: "FAILED",
+      omieError: String(err),
     }).catch(() => undefined);
   }
 }

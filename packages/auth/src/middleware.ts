@@ -2,13 +2,13 @@ import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
 import type { Role } from "@nexora/db";
 
-const PUBLIC_PATHS = ["/login", "/certificado", "/api/auth", "/_next", "/favicon"];
+const PUBLIC_PATHS = ["/login", "/certificado", "/p/", "/api/auth", "/_next", "/favicon", "/manifest"];
 
 const ROUTE_ROLES: { prefix: string; roles: Role[] }[] = [
-  { prefix: "/admin", roles: ["ADMIN", "SUPER_ADMIN"] },
-  { prefix: "/coord", roles: ["COORDENADOR", "ADMIN", "SUPER_ADMIN"] },
-  { prefix: "/prof", roles: ["PROFESSOR", "COORDENADOR", "ADMIN", "SUPER_ADMIN"] },
-  { prefix: "/aluno", roles: ["ALUNO", "PROFESSOR", "COORDENADOR", "ADMIN", "SUPER_ADMIN"] },
+  { prefix: "/admin", roles: ["ADMINISTRATOR", "OWNER", "TI_SUPPORT"] },
+  { prefix: "/coord", roles: ["ASSISTANT", "ADMINISTRATOR", "OWNER"] },
+  { prefix: "/prof", roles: ["PROFESSOR", "ASSISTANT", "ADMINISTRATOR", "OWNER"] },
+  { prefix: "/aluno", roles: ["STUDENT", "PROFESSOR", "ASSISTANT", "ADMINISTRATOR", "OWNER"] },
 ];
 
 export async function middleware(req: NextRequest) {

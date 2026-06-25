@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
   const { role, activeTenantId } = session.user;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "COORDENADOR") {
+  if (role !== "ADMINISTRATOR" && role !== "OWNER" && role !== "ASSISTANT") {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 

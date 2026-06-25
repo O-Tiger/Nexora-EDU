@@ -14,11 +14,11 @@ const tenantLabels: Record<string, string> = {
 };
 
 const navItems = [
-  { href: "/aluno", label: "Início", icon: Home, exact: true },
-  { href: "/aluno/cursos", label: "Meus Cursos", icon: BookOpen },
-  { href: "/aluno/avaliacoes", label: "Avaliações", icon: FileCheck2 },
-  { href: "/aluno/comunicacao", label: "Comunicação", icon: MessageSquare },
-  { href: "/aluno/meus-dados", label: "Meus Dados", icon: ShieldCheck },
+  { href: "/aluno", label: "Início", icon: Home, exact: true, tourId: "aluno-nav-inicio" },
+  { href: "/aluno/cursos", label: "Meus Cursos", icon: BookOpen, tourId: "aluno-nav-cursos" },
+  { href: "/aluno/avaliacoes", label: "Avaliações", icon: FileCheck2, tourId: "aluno-nav-avaliacoes" },
+  { href: "/aluno/comunicacao", label: "Comunicação", icon: MessageSquare, tourId: "aluno-nav-comunicacao" },
+  { href: "/aluno/meus-dados", label: "Meus Dados", icon: ShieldCheck, tourId: "aluno-nav-dados" },
 ];
 
 export function StudentSidebar({ user }: { user: { name: string; tenantId: string } }) {
@@ -40,6 +40,7 @@ export function StudentSidebar({ user }: { user: { name: string; tenantId: strin
               href={item.href as never}
               onClick={() => setOpen(false)}
               aria-current={active ? "page" : undefined}
+              data-tour={item.tourId}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-ring",
                 active ? "bg-teal-50 text-teal-700" : "text-navy-600 hover:bg-navy-50 hover:text-navy-900",

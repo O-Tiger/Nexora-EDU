@@ -32,9 +32,9 @@ async function requireEnrollment(lessonId: string) {
   if (!lesson) throw new Error("Aula não encontrada");
 
   const isStaff =
-    session.user.role === "ADMIN" ||
-    session.user.role === "SUPER_ADMIN" ||
-    session.user.role === "COORDENADOR" ||
+    session.user.role === "ADMINISTRATOR" ||
+    session.user.role === "OWNER" ||
+    session.user.role === "ASSISTANT" ||
     session.user.role === "PROFESSOR";
 
   const enrollment = lesson.module.course.enrollments[0];

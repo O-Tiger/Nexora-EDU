@@ -31,14 +31,18 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships    TenantMembership[]
-  auditLogs      AuditLog[]
-  onboarding     UserOnboarding[]
-  announcements  Announcement[]
-  forumThreads   ForumThread[]  @relation("ForumThreadAuthor")
-  forumReplies   ForumReply[]   @relation("ForumReplyAuthor")
-  sentMessages   DirectMessage[] @relation("DMSender")
-  receivedMessages DirectMessage[] @relation("DMReceiver")
+  memberships      TenantMembership[]
+  auditLogs        AuditLog[]
+  onboarding       UserOnboarding[]
+  announcements    Announcement[]
+  forumThreads     ForumThread[]    @relation("ForumThreadAuthor")
+  forumReplies     ForumReply[]     @relation("ForumReplyAuthor")
+  sentMessages     DirectMessage[]  @relation("DMSender")
+  receivedMessages DirectMessage[]  @relation("DMReceiver")
+  turmaEnrollments TurmaEnrollment[] @relation("StudentTurmaEnrollments")
+  mensalidades     Mensalidade[]    @relation("StudentMensalidades")
+  reservas         ReservaVaga[]    @relation("StudentReservas")
+  linkedProfessor  Professor?       @relation("ProfessorUser")
 
   @@index([email])
 }
@@ -62,11 +66,13 @@ model TenantMembership {
 }
 
 enum Role {
-  ALUNO
+  STUDENT
   PROFESSOR
-  COORDENADOR
-  ADMIN
-  SUPER_ADMIN
+  ASSISTANT
+  ADMINISTRATOR
+  OWNER
+  RESPONSIBLE
+  TI_SUPPORT
 }
 
 // ─── EAD ─────────────────────────────────────────────────────────────────────
@@ -350,7 +356,64 @@ model PageLayout {
   @@index([tenantId, pageType, publishedAt])
 }
 
+/// Estado global de uma página por tenant: controla se está ao vivo ou arquivada.
+/// Separado de PageLayout para não acoplar estado de controle ao versionamento de conteúdo.
+model PageConfig {
+  id         String    @id @default(cuid())
+  tenantId   String
+  pageType   String
+  /// null = despublicada; set = ao vivo
+  liveAt     DateTime?
+  /// null = ativa; set = arquivada (bloqueia edição e acesso público)
+  archivedAt DateTime?
+  updatedBy  String
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([tenantId, pageType])
+  @@index([tenantId, pageType])
+}
+
+// ─── DOMÍNIOS ─────────────────────────────────────────────────────────────────
+
+/// Mapeia domínios/subdomínios públicos a um tenant, para hospedagem pública
+/// das páginas montadas no Page Builder (/p/[pageType]) sem exigir login.
+model TenantDomain {
+  id        String   @id @default(cuid())
+  tenantId  String
+  /// Host normalizado em minúsculas, sem protocolo nem porta (ex: "cursos.escola.com.br")
+  domain    String   @unique
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
 // ─── CERTIFICADOS ─────────────────────────────────────────────────────────────
+
+/// Template customizável de certificado por tenant (estilo page builder).
+/// Os textos usam {{placeholders}}: {{name}}, {{course}}, {{hours}}, {{date}},
+/// {{cpf}}, {{code}}, {{city}}.
+model CertificateTemplate {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+  /// Nome da instituição (linha de cabeçalho)
+  institutionName String
+  /// Texto de credenciamento/subtítulo (ex: portaria de credenciamento)
+  subtitle        String?
+  title           String   @default("CERTIFICADO")
+  /// Corpo do certificado com {{placeholders}}
+  bodyTemplate    String
+  /// Assinaturas: JSON array de { name, role, document }
+  signatures      Json
+  /// URL do logo (R2 ou externa)
+  logoUrl         String?
+  /// Cidade da linha "Cidade, data"
+  city            String?
+  /// Cor de destaque (hex)
+  accentColor     String   @default("#0D9488")
+  updatedAt       DateTime @updatedAt
+  updatedBy       String
+}
 
 /// Certificado emitido ao concluir um curso.
 /// O código único é usado para validação pública em /certificado/{code}.
@@ -575,4 +638,577 @@ enum DataExportStatus {
   PENDING
   READY
   EXPIRED
+}
+
+// ─── SECRETARIA ───────────────────────────────────────────────────────────────
+
+/// Unidade física da escola (ex: "Colinas", "Caminhos", "Principal").
+/// Escolas com uma única unidade criam uma unidade "Principal".
+/// A unidade determina a identidade de gênero para escolas single-sex.
+model Unidade {
+  id        String        @id @default(cuid())
+  tenantId  String
+  /// Nome exibido: "Colinas", "Caminhos", "Principal"
+  name      String
+  /// Código curto usado nos códigos de turma: "COL", "CAM", ""
+  code      String
+  gender    UnidadeGender @default(MISTO)
+  active    Boolean       @default(true)
+  createdAt DateTime      @default(now())
+
+  turmas    Turma[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, active])
+}
+
+enum UnidadeGender {
+  MASCULINO
+  FEMININO
+  MISTO
+}
+
+/// Ano letivo. Todas as turmas pertencem a um ano letivo.
+model AnoLetivo {
+  id        String          @id @default(cuid())
+  tenantId  String
+  year      Int
+  startDate DateTime
+  endDate   DateTime
+  status    AnoLetivoStatus @default(PLANEJADO)
+  createdAt DateTime        @default(now())
+
+  turmas       Turma[]
+  planos       PlanoCobranca[]
+  mensalidades Mensalidade[]
+
+  @@unique([tenantId, year])
+  @@index([tenantId, status])
+}
+
+enum AnoLetivoStatus {
+  PLANEJADO
+  EM_ANDAMENTO
+  ENCERRADO
+}
+
+/// Turma de uma unidade em um ano letivo.
+/// O código é gerado automaticamente a partir da etapa + ano + letra + unidade:
+///   EFAICCC → "EFAICCC1A" (anos 1-2, misto)
+///   EFAI    → "EFAI3ACOL"
+///   EFAF    → "EFAF6BCAM"
+///   EM      → "EM2BCOL"
+/// Para escolas comuns (unidade code = ""), o código omite o sufixo: "EFAI3A"
+model Turma {
+  id          String   @id @default(cuid())
+  tenantId    String
+  unidadeId   String
+  anoLetivoId String
+  /// Código único dentro do ano letivo: "EFAI3ACOL", "EM2BCAM", "EFAICCC1A"
+  code        String
+  etapa       Etapa
+  /// Ano dentro da etapa: 1-5 (EFAI/EFAICCC), 6-9 (EFAF), 1-3 (EM)
+  ano         Int
+  /// Letra da turma: "A", "B", "C" ...
+  letra       String
+  periodo     Periodo  @default(MANHA)
+  maxStudents Int      @default(35)
+  /// Prefixo de etapa usado para gerar o code (ex: "EFAI", "EFAF", "EM"). Armazenado para
+  /// permitir auto-criação de turmas do próximo ano com o prefixo correto.
+  etapaPrefix String?
+  /// Configuração do horário: { slots: [{ ordem, inicio, fim }], sabado: bool }
+  horarioConfig Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  unidade     Unidade         @relation(fields: [unidadeId], references: [id])
+  anoLetivo   AnoLetivo       @relation(fields: [anoLetivoId], references: [id])
+  enrollments      TurmaEnrollment[]
+  disciplinas      TurmaDisciplina[]
+  registros        RegistroAula[]
+  horarios         HorarioAula[]
+  eventos          EventoCalendario[]
+  planos           PlanoCobranca[]
+  reservasAtuais   ReservaVaga[]    @relation("TurmaReservasAtuais")
+  reservasProximas ReservaVaga[]    @relation("TurmaReservasProximas")
+
+  @@unique([tenantId, anoLetivoId, code])
+  @@index([tenantId, anoLetivoId])
+  @@index([unidadeId, etapa])
+}
+
+enum Etapa {
+  /// Educação Infantil
+  EI
+  /// Ensino Fundamental Anos Iniciais (séries 1-5)
+  EF1
+  /// Ensino Fundamental Anos Finais (séries 6-9)
+  EF2
+  /// Ensino Médio (anos 1-3)
+  EM
+}
+
+enum Periodo {
+  MANHA
+  TARDE
+  NOITE
+  INTEGRAL
+}
+
+/// Matrícula de um aluno em uma turma (Secretaria, distinto de Enrollment EAD).
+model TurmaEnrollment {
+  id          String                @id @default(cuid())
+  tenantId    String
+  studentId   String
+  turmaId     String
+  /// Denormalizado para facilitar consultas históricas por ano letivo
+  anoLetivoId String
+  status      TurmaEnrollmentStatus @default(ATIVA)
+  enrolledAt  DateTime              @default(now())
+  cancelledAt DateTime?
+  notes       String?
+
+  turma       Turma        @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  student     User         @relation("StudentTurmaEnrollments", fields: [studentId], references: [id])
+  grades      Grade[]
+  attendances Attendance[]
+  presencas   PresencaAluno[]
+  enrollmentFrentes EnrollmentFrente[]
+
+  /// Um aluno só pode estar em uma turma por ano letivo
+  @@unique([studentId, anoLetivoId])
+  @@index([tenantId, turmaId])
+  @@index([tenantId, anoLetivoId])
+  @@index([studentId])
+}
+
+enum TurmaEnrollmentStatus {
+  ATIVA
+  TRANSFERIDA
+  CANCELADA
+  CONCLUIDA
+}
+
+/// Responsável/guardian de um aluno menor de idade.
+/// userId é opcional: quando preenchido, o responsável tem acesso ao portal.
+model Guardian {
+  id           String               @id @default(cuid())
+  tenantId     String
+  /// userId do aluno (User)
+  studentId    String
+  name         String
+  email        String?
+  phone        String?
+  cpf          String?
+  relationship GuardianRelationship
+  isPrimary    Boolean              @default(false)
+  /// Quando preenchido, este responsável tem login no portal
+  userId       String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([tenantId, studentId])
+  @@index([studentId])
+}
+
+enum GuardianRelationship {
+  PAI
+  MAE
+  RESPONSAVEL
+  OUTRO
+}
+
+// ─── PEDAGÓGICO ───────────────────────────────────────────────────────────────
+
+/// Disciplina de uma etapa (ex: "Matemática"). Pode ter frentes — sub-disciplinas
+/// graduadas separadamente (ex: "Matemática 1", "Matemática 2"). Frente = Disciplina
+/// com parentId preenchido. No boletim, pai e frentes aparecem como linhas próprias.
+model Disciplina {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  /// null = disciplina raiz; preenchido = frente de outra disciplina
+  parentId  String?
+  /// Ordem de exibição no boletim
+  position  Int      @default(0)
+  /// Cor (hex) usada na grade de horários e identidade visual
+  color     String?
+  active    Boolean  @default(true)
+  /// Itinerário Formativo: cada aluno escolhe uma frente (trilha). Apenas a frente
+  /// escolhida aparece no boletim e aceita lançamento de notas para aquele aluno.
+  isItinerario Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  parent           Disciplina?       @relation("Frentes", fields: [parentId], references: [id], onDelete: Cascade)
+  frentes          Disciplina[]      @relation("Frentes")
+  turmaDisciplinas TurmaDisciplina[]
+  grades           Grade[]
+  attendances      Attendance[]
+  registros        RegistroAula[]
+  horarios         HorarioAula[]
+  enrollmentFrentesAsParent EnrollmentFrente[] @relation("EFParent")
+  enrollmentFrentesAsFrente EnrollmentFrente[] @relation("EFFrente")
+
+  @@index([tenantId, parentId])
+  @@index([tenantId, active])
+}
+
+/// Itinerário Formativo: vincula um aluno matriculado à frente (trilha) que ele
+/// escolheu dentro de uma disciplina de itinerário (ex: IFO → Marketing).
+/// Apenas a frente escolhida aparece no boletim e aceita notas para este aluno.
+model EnrollmentFrente {
+  id           String @id @default(cuid())
+  tenantId     String
+  enrollmentId String
+  /// Disciplina-pai marcada como isItinerario (ex: IFO)
+  disciplinaId String
+  /// Frente escolhida pelo aluno (ex: Marketing — filha de IFO)
+  frenteId     String
+
+  enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  disciplina Disciplina      @relation("EFParent", fields: [disciplinaId], references: [id], onDelete: Cascade)
+  frente     Disciplina      @relation("EFFrente", fields: [frenteId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, disciplinaId])
+  @@index([tenantId, disciplinaId])
+}
+
+/// Vínculo disciplina ↔ turma (quais disciplinas a turma cursa).
+/// professorId opcional: professor responsável por essa disciplina nesta turma.
+model TurmaDisciplina {
+  id           String @id @default(cuid())
+  tenantId     String
+  turmaId      String
+  disciplinaId String
+  professorId  String?
+
+  turma      Turma      @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  professor  Professor? @relation(fields: [professorId], references: [id], onDelete: SetNull)
+
+  @@unique([turmaId, disciplinaId])
+  @@index([tenantId, turmaId])
+}
+
+/// Professor: cadastro interno (sem login/senha), gerenciado por admins.
+/// Usado apenas para vincular disciplinas na grade — não autentica.
+/// userId: quando preenchido, vincula o cadastro interno ao User que faz login como PROFESSOR.
+model Professor {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  email     String?
+  phone     String?
+  active    Boolean  @default(true)
+  /// FK opcional para User — permite que o professor acesse o portal /prof
+  userId    String?  @unique
+  createdAt DateTime @default(now())
+
+  linkedUser       User?            @relation("ProfessorUser", fields: [userId], references: [id], onDelete: SetNull)
+  turmaDisciplinas TurmaDisciplina[]
+
+  @@index([tenantId, active])
+}
+
+/// Nota de um aluno numa disciplina, por período (trimestre) e tipo de avaliação.
+model Grade {
+  id           String    @id @default(cuid())
+  tenantId     String
+  enrollmentId String
+  disciplinaId String
+  /// 1, 2, 3 = trimestre; usado com kind para localizar a célula do boletim
+  period       Int
+  kind         GradeKind
+  score        Float?
+  updatedAt    DateTime  @updatedAt
+  updatedBy    String
+
+  enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  disciplina Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, disciplinaId, period, kind])
+  @@index([tenantId, enrollmentId])
+  @@index([disciplinaId])
+}
+
+enum GradeKind {
+  /// Avaliação do trimestre
+  AVA
+  /// Recuperação do trimestre
+  RECP
+  /// Prova final
+  FINAL
+}
+
+/// Frequência: faltas acumuladas de um aluno numa disciplina.
+/// Usada como fallback manual quando não há diário de classe lançado.
+model Attendance {
+  id           String   @id @default(cuid())
+  tenantId     String
+  enrollmentId String
+  disciplinaId String
+  absences     Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  disciplina Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, disciplinaId])
+  @@index([tenantId, enrollmentId])
+}
+
+/// Diário de classe: registro de uma aula (turma + disciplina + data) com o
+/// conteúdo ministrado. Pode representar N aulas geminadas (quantidadeAulas).
+model RegistroAula {
+  id              String   @id @default(cuid())
+  tenantId        String
+  turmaId         String
+  disciplinaId    String
+  data            DateTime
+  /// Quantas aulas/períodos este registro representa (geminadas contam mais faltas)
+  quantidadeAulas Int      @default(1)
+  conteudo        String
+  observacoes     String?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  turma      Turma           @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  presencas  PresencaAluno[]
+
+  @@index([tenantId, turmaId, disciplinaId, data])
+}
+
+/// Presença de um aluno num registro de aula.
+/// Suporta presença parcial em aulas geminadas: o aluno pode faltar a algumas
+/// das N aulas do registro. Só são persistidos alunos com falta (presença = ausência de linha).
+model PresencaAluno {
+  id           String @id @default(cuid())
+  registroId   String
+  enrollmentId String
+  /// Faltas não justificadas neste registro (0..quantidadeAulas) — contam no boletim
+  faltas       Int    @default(0)
+  /// Faltas justificadas (não contam no boletim)
+  justificadas Int    @default(0)
+
+  registro   RegistroAula    @relation(fields: [registroId], references: [id], onDelete: Cascade)
+  enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@unique([registroId, enrollmentId])
+  @@index([enrollmentId])
+}
+
+/// Grade de horários: uma aula recorrente da turma num dia da semana e ordem.
+model HorarioAula {
+  id           String         @id @default(cuid())
+  tenantId     String
+  turmaId      String
+  /// 1 = segunda … 7 = domingo
+  diaSemana    Int
+  /// Ordem da aula no dia (1ª, 2ª, …)
+  ordem        Int
+  disciplinaId String
+  /// Frequência da aula: toda semana, quinzenal semanas pares ou ímpares
+  frequencia   FrequenciaAula @default(SEMANAL)
+
+  turma      Turma      @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+
+  @@unique([turmaId, diaSemana, ordem, frequencia])
+  @@index([tenantId, turmaId])
+}
+
+enum FrequenciaAula {
+  /// Toda semana
+  SEMANAL
+  /// Quinzenal — semanas pares (2ª, 4ª, …)
+  QUINZENAL_PAR
+  /// Quinzenal — semanas ímpares (1ª, 3ª, …)
+  QUINZENAL_IMPAR
+}
+
+/// Evento do calendário da turma: prova, simulado, olimpíada, etc.
+model EventoCalendario {
+  id          String     @id @default(cuid())
+  tenantId    String
+  turmaId     String
+  data        DateTime
+  tipo        TipoEvento
+  titulo      String
+  descricao   String?
+  createdAt   DateTime   @default(now())
+
+  turma Turma @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, turmaId, data])
+}
+
+enum TipoEvento {
+  PROVA
+  SIMULADO
+  OLIMPIADA
+  TRABALHO
+  REUNIAO
+  PASSEIO
+  FERIADO
+  OUTRO
+}
+
+// ─── FINANCEIRO ───────────────────────────────────────────────────────────────
+
+/// Plano de cobrança de mensalidades de um ano letivo.
+/// Pode ser global (turmaId null) ou específico por turma.
+model PlanoCobranca {
+  id            String   @id @default(cuid())
+  tenantId      String
+  anoLetivoId   String
+  /// null = aplica a todas as turmas do ano letivo
+  turmaId       String?
+  nome          String
+  /// Valor em centavos (ex: 85000 = R$850,00)
+  valorCents    Int
+  /// Dia do mês em que vence (1-28)
+  vencimentoDia Int
+  /// Meses em que a cobrança se aplica: [2,3,4,5,6,7,8,9,10,11]
+  meses         Int[]
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  anoLetivo    AnoLetivo     @relation(fields: [anoLetivoId], references: [id])
+  turma        Turma?        @relation(fields: [turmaId], references: [id], onDelete: SetNull)
+  mensalidades Mensalidade[]
+
+  @@index([tenantId, anoLetivoId])
+  @@index([tenantId, ativo])
+}
+
+/// Mensalidade individual de um aluno vinculada a um plano de cobrança.
+/// Os campos Omie são preenchidos após sincronização com o ERP.
+model Mensalidade {
+  id               String            @id @default(cuid())
+  tenantId         String
+  studentId        String
+  planoId          String
+  anoLetivoId      String
+  /// Mês de referência (1-12)
+  mes              Int
+  /// Ano de referência (ex: 2026)
+  ano              Int
+  /// Valor efetivo em centavos (pode diferir do plano por desconto)
+  valorCents       Int
+  /// Desconto aplicado em centavos
+  descontoCents    Int               @default(0)
+  vencimento       DateTime
+  status           MensalidadeStatus @default(PENDENTE)
+  tipo             MensalidadeTipo   @default(MENSALIDADE)
+  /// ID do cliente no Omie (codigo_cliente_omie)
+  omieClientId     String?
+  /// ID da conta a receber no Omie (nCodLancamento)
+  omieReceivableId String?
+  omieSyncStatus   OmieSyncStatus    @default(PENDING)
+  omieError        String?
+  /// Preenchido pelo webhook Omie quando confirmado
+  paidAt           DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  student   User          @relation("StudentMensalidades", fields: [studentId], references: [id])
+  plano     PlanoCobranca @relation(fields: [planoId], references: [id])
+  anoLetivo AnoLetivo     @relation(fields: [anoLetivoId], references: [id])
+
+  /// Um aluno não pode ter duas mensalidades do mesmo plano no mesmo mês/ano
+  @@unique([studentId, planoId, mes, ano])
+  @@index([tenantId, anoLetivoId])
+  @@index([tenantId, status])
+  @@index([studentId])
+}
+
+enum MensalidadeStatus {
+  PENDENTE
+  PAGA
+  VENCIDA
+  CANCELADA
+  ISENTA
+}
+
+enum MensalidadeTipo {
+  MENSALIDADE
+  TAXA_RESERVA
+}
+
+enum ReservaStatus {
+  /// Reserva criada, aguardando pagamento da taxa
+  PENDENTE
+  /// Taxa paga — vaga garantida para o próximo ano
+  PAGA
+  /// Matrícula confirmada — TurmaEnrollment criado no próximo ano letivo
+  CONFIRMADA
+  /// Cancelada pelo admin (campo cancelReason obrigatório)
+  CANCELADA
+}
+
+// ─── RESERVAS DE VAGA ─────────────────────────────────────────────────────────
+
+/// Reserva de vaga de um aluno para o próximo ano letivo.
+/// A turma do próximo ano é criada automaticamente na primeira reserva daquele
+/// nível, herdando as disciplinas (sem professores nem horário).
+/// Uma taxa de reserva (Mensalidade.tipo = TAXA_RESERVA) é gerada junto.
+model ReservaVaga {
+  id               String       @id @default(cuid())
+  tenantId         String
+  studentId        String
+  /// Ano letivo de onde o aluno está saindo
+  anoLetivoAtualId String
+  /// Turma atual do aluno
+  turmaAtualId     String
+  /// Turma reservada no próximo ano letivo (criada automaticamente se necessário)
+  turmaProximaId   String
+  status           ReservaStatus @default(PENDENTE)
+  /// Mensalidade de taxa de reserva vinculada (tipo = TAXA_RESERVA)
+  mensalidadeId    String?      @unique
+  entrevistaAt     DateTime?
+  confirmedAt      DateTime?
+  cancelledAt      DateTime?
+  cancelReason     String?
+  notes            String?
+  /// Usuário admin que criou a reserva
+  createdBy        String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  student      User    @relation("StudentReservas", fields: [studentId], references: [id])
+  turmaAtual   Turma   @relation("TurmaReservasAtuais",  fields: [turmaAtualId],   references: [id])
+  turmaProxima Turma   @relation("TurmaReservasProximas", fields: [turmaProximaId], references: [id])
+
+  @@unique([studentId, anoLetivoAtualId])
+  @@index([tenantId, anoLetivoAtualId])
+  @@index([tenantId, status])
+}
+
+// ─── CONFIGURAÇÕES ───────────────────────────────────────────────────────────
+
+/// Configurações por tenant — uma linha por instituição.
+model TenantConfig {
+  tenantId String @id
+
+  /// Nome oficial da instituição (ex: "Colégio Caminhos e Colinas")
+  schoolName    String?
+  /// Endereço físico
+  schoolAddress String?
+  /// CNPJ da instituição
+  cnpj          String?
+
+  /// URL pública do logo da instituição (R2 ou externa)
+  logoUrl       String?
+
+  /// Domínio de email institucional (ex: "caminhosecolinas.org.br")
+  emailDomain   String?
+  /// Template da parte local do email — placeholders: {primeiroNome}, {primeiroSobrenome}, {nomeCompleto}
+  /// Exemplo: "{primeiroNome}.{primeiroSobrenome}"
+  emailTemplate String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

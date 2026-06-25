@@ -30,7 +30,7 @@ export default async function EnrollmentsPage() {
       select: { id: true, title: true },
     }),
     prisma.tenantMembership.findMany({
-      where: { tenantId, role: "ALUNO", active: true },
+      where: { tenantId, role: "STUDENT", active: true },
       include: { user: { select: { id: true, name: true, email: true } } },
     }),
   ]);

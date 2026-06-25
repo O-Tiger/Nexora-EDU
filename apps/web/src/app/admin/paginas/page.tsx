@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { auth } from "@nexora/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Layout, ChevronRight } from "lucide-react";
+import { Layout, ChevronRight, Globe } from "lucide-react";
+import { Button } from "@nexora/ui";
 import { getLatestPublished } from "@nexora/db/src/queries/layouts";
 import { PAGE_TYPES, type PageType } from "@nexora/validators";
 
@@ -26,9 +27,16 @@ export default async function PaginasPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-navy-900">Páginas</h1>
-        <p className="text-sm text-navy-500">Edite o visual da plataforma sem código.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-navy-900">Páginas</h1>
+          <p className="text-sm text-navy-500">Edite o visual da plataforma sem código.</p>
+        </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link href={"/admin/dominios" as never} className="gap-2">
+            <Globe className="h-4 w-4" /> Domínios
+          </Link>
+        </Button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
   // Find an admin to receive the message (first ADMIN of the tenant)
   const adminMembership = await prisma.tenantMembership.findFirst({
-    where: { tenantId, role: { in: ["ADMIN", "SUPER_ADMIN"] }, active: true },
+    where: { tenantId, role: { in: ["ADMINISTRATOR", "OWNER"] }, active: true },
     select: { userId: true },
   });
 

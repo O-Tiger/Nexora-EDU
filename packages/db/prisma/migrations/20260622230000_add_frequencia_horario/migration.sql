@@ -1,0 +1,2 @@
+CREATE TYPE "FrequenciaAula" AS ENUM ('SEMANAL', 'QUINZENAL_PAR', 'QUINZENAL_IMPAR');
+ALTER TABLE "HorarioAula" ADD COLUMN "frequencia" "FrequenciaAula" NOT NULL DEFAULT 'SEMANAL';

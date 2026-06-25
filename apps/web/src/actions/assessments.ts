@@ -26,7 +26,7 @@ async function requireStaff() {
   const session = await auth();
   if (!session) redirect("/login");
   const { role, activeTenantId, id } = session.user;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN" && role !== "COORDENADOR" && role !== "PROFESSOR") {
+  if (role !== "ADMINISTRATOR" && role !== "OWNER" && role !== "ASSISTANT" && role !== "PROFESSOR") {
     redirect("/unauthorized");
   }
   return { tenantId: activeTenantId, userId: id, role };
