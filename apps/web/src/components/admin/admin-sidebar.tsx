@@ -59,6 +59,7 @@ const WORKSPACES: Record<Workspace, { label: string; icon: typeof LayoutDashboar
       { href: "/admin/secretaria/alunos", label: "Alunos da escola", icon: GraduationCap, tourId: "sec-nav-alunos" },
       { href: "/admin/secretaria/professores", label: "Professores", icon: UserCog, tourId: "sec-nav-professores" },
       { href: "/admin/secretaria/disciplinas", label: "Disciplinas", icon: BookMarked, tourId: "sec-nav-disciplinas" },
+      { href: "/admin/secretaria/avaliacoes", label: "Avaliações", icon: Award, tourId: "sec-nav-avaliacoes" },
       { href: "/admin/secretaria/boletins", label: "Boletins", icon: FileText, tourId: "sec-nav-boletins" },
       { href: "/admin/secretaria/financeiro", label: "Financeiro", icon: DollarSign, tourId: "sec-nav-financeiro" },
       { href: "/admin/secretaria/reservas", label: "Reservas de Vaga", icon: BookmarkCheck, tourId: "sec-nav-reservas" },

@@ -37,13 +37,12 @@ export async function GET(req: Request) {
   if (!data) return NextResponse.json({ error: "Turma não encontrada" }, { status: 404 });
   if (data.students.length === 0) return NextResponse.json({ error: "Sem dados de notas" }, { status: 400 });
 
-  const periodos = tenantConfig?.periodos ?? 3;
   const html = buildBoletimHtml(data, {
     name: tenantConfig?.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || BRAND.name,
     ...(tenantConfig?.cnpj && { cnpj: tenantConfig.cnpj }),
     ...(tenantConfig?.schoolAddress && { address: tenantConfig.schoolAddress }),
     ...(tenantConfig?.logoUrl && { logoUrl: tenantConfig.logoUrl }),
-  }, "avulsas", periodos);
+  }, "avulsas");
 
   let rendered;
   try {

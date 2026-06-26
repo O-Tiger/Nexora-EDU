@@ -5,7 +5,6 @@ import Link from "next/link";
 import { FileText, Download } from "lucide-react";
 import { getFilhosFromSession, pickFilho } from "@/lib/responsavel";
 import { getBoletimData } from "@nexora/db/src/queries/pedagogico";
-import { getTenantConfig } from "@nexora/db/src/queries/administracao";
 import { prisma } from "@nexora/db";
 
 export const metadata: Metadata = { title: "Boletim" };
@@ -18,12 +17,10 @@ export default async function ResponsavelBoletimPage({
   const session = await auth();
   if (!session) redirect("/login");
 
-  const [filhos, sp, tenantConfig] = await Promise.all([
+  const [filhos, sp] = await Promise.all([
     getFilhosFromSession(session.user.id, session.user.activeTenantId),
     searchParams,
-    getTenantConfig(session.user.activeTenantId),
   ]);
-  const periodos = tenantConfig?.periodos ?? 3;
   const filho = pickFilho(filhos, sp.studentId);
 
   if (!filho?.turmaId) {
@@ -52,10 +49,7 @@ export default async function ResponsavelBoletimPage({
   }
 
   const aluno = boletim.students[0]!;
-  const periods = Array.from({ length: periodos }, (_, i) => i + 1);
-  const kinds = ["AVA", "RECP"] as const;
-  const periodAbbr = periodos === 2 ? "S" : periodos === 4 ? "B" : "T";
-
+  const configs = boletim.configs;
   const pdfUrl = `/api/responsavel/boletim?turmaId=${filho.turmaId}${enrollment ? `&enrollmentId=${enrollment.id}` : ""}&format=pdf`;
 
   return (
@@ -83,14 +77,11 @@ export default async function ResponsavelBoletimPage({
           <thead className="bg-navy-50 border-b border-navy-100">
             <tr>
               <th className="px-4 py-2 text-left text-xs font-semibold text-navy-600">Disciplina</th>
-              {periods.map((p) => (
-                kinds.map((k) => (
-                  <th key={`${p}-${k}`} className="px-3 py-2 text-center text-xs font-semibold text-navy-600">
-                    {k === "AVA" ? `${periodAbbr}${p}` : `Rec ${p}`}
-                  </th>
-                ))
+              {configs.map((c) => (
+                <th key={c.id} className="px-3 py-2 text-center text-xs font-semibold text-navy-600" title={c.label}>
+                  {c.sigla}
+                </th>
               ))}
-              <th className="px-3 py-2 text-center text-xs font-semibold text-navy-600">Final</th>
               <th className="px-3 py-2 text-center text-xs font-semibold text-navy-600">Faltas</th>
             </tr>
           </thead>
@@ -100,29 +91,20 @@ export default async function ResponsavelBoletimPage({
                 <td className={`px-4 py-2 text-navy-800 ${row.isFrente ? "pl-8 text-navy-500 text-xs" : "font-medium"}`}>
                   {row.name}
                 </td>
-                {periods.map((p) => (
-                  kinds.map((k) => {
-                    const score = row.grades[`p${p}-${k}`] ?? null;
-                    return (
-                      <td key={`${p}-${k}`} className="px-3 py-2 text-center">
-                        {score !== null ? (
-                          <span className={score < 6 ? "text-red-600 font-semibold" : "text-navy-800"}>
-                            {score.toFixed(1)}
-                          </span>
-                        ) : (
-                          <span className="text-navy-300">—</span>
-                        )}
-                      </td>
-                    );
-                  })
-                ))}
-                <td className="px-3 py-2 text-center">
-                  {row.grades["p0-FINAL"] != null ? (
-                    <span className={row.grades["p0-FINAL"]! < 5 ? "text-red-600 font-semibold" : "text-navy-800"}>
-                      {row.grades["p0-FINAL"]!.toFixed(1)}
-                    </span>
-                  ) : <span className="text-navy-300">—</span>}
-                </td>
+                {configs.map((c) => {
+                  const score = row.grades[c.id] ?? null;
+                  return (
+                    <td key={c.id} className="px-3 py-2 text-center">
+                      {score !== null ? (
+                        <span className={score < 6 ? "text-red-600 font-semibold" : "text-navy-800"}>
+                          {score.toFixed(1)}
+                        </span>
+                      ) : (
+                        <span className="text-navy-300">—</span>
+                      )}
+                    </td>
+                  );
+                })}
                 <td className="px-3 py-2 text-center text-navy-600">{row.absences}</td>
               </tr>
             ))}

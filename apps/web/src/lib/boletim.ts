@@ -1,4 +1,5 @@
 import type { BoletimData, BoletimStudent, BoletimDisciplinaRow } from "@nexora/db/src/queries/pedagogico";
+import type { AvaliacaoConfigRow } from "@nexora/db/src/queries/avaliacoes";
 
 // Puppeteer carregado dinamicamente — fora do bundle client
 async function getPuppeteer() {
@@ -15,34 +16,24 @@ export type BoletimFrentes = "avulsas" | "media";
 /** "padrao": layout genérico do Nexora · "ccc": layout Colégio Caminhos e Colinas. */
 export type BoletimTemplate = "padrao" | "ccc";
 
-function gradeKeys(periodos: number): string[] {
-  const keys: string[] = [];
-  for (let i = 1; i <= periodos; i++) {
-    keys.push(`p${i}-AVA`);
-    keys.push(`p${i}-RECP`);
-  }
-  keys.push("p0-RECP");
-  keys.push("p0-FINAL");
-  return keys;
-}
-
-function periodLabel(i: number, periodos: number): string {
-  if (periodos === 2) return `${i}º Sem.`;
-  if (periodos === 4) return `${i}º Bim.`;
+function periodLabel(i: number, numPeriods: number): string {
+  if (numPeriods === 2) return `${i}º Sem.`;
+  if (numPeriods === 4) return `${i}º Bim.`;
   return `${i}º Trim.`;
 }
 
+function uniqueAVAPeriods(configs: AvaliacaoConfigRow[]): number[] {
+  return [...new Set(configs.filter((c) => c.periodo > 0 && !c.isRecuperacao).map((c) => c.periodo))].sort((a, b) => a - b);
+}
+
 /**
- * Consolida as frentes na disciplina-mãe, fazendo a média de cada célula.
- * Se a mãe não está nas linhas (frentes órfãs), cria uma linha sintética
- * com o nome da mãe (buscado em disciplinaNames) e a média das frentes.
+ * Consolida as frentes na disciplina-mãe, fazendo a média de cada célula (config-agnostic).
+ * Se a mãe não está nas linhas (frentes órfãs), cria uma linha sintética.
  */
 function consolidateRows(
   rows: BoletimDisciplinaRow[],
-  periodos: number,
   disciplinaNames: Map<string, string> = new Map(),
 ): BoletimDisciplinaRow[] {
-  const keys = gradeKeys(periodos);
   const byId = new Set(rows.map((r) => r.disciplinaId));
   const frentesByParent = new Map<string, BoletimDisciplinaRow[]>();
   for (const r of rows) {
@@ -54,8 +45,9 @@ function consolidateRows(
   }
 
   function avgRows(sources: BoletimDisciplinaRow[]): Record<string, number | null> {
+    const allKeys = new Set(sources.flatMap((s) => Object.keys(s.grades)));
     const grades: Record<string, number | null> = {};
-    for (const k of keys) {
+    for (const k of allKeys) {
       const vals = sources.map((s) => s.grades[k]).filter((v): v is number => typeof v === "number");
       grades[k] = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : null;
     }
@@ -64,7 +56,6 @@ function consolidateRows(
 
   const result: BoletimDisciplinaRow[] = [];
 
-  // Non-frente rows: consolidate any frentes that have this row as parent
   for (const r of rows) {
     if (r.isFrente) continue;
     const frentes = frentesByParent.get(r.disciplinaId) ?? [];
@@ -103,27 +94,55 @@ interface SchoolHeader {
   logoUrl?: string;
 }
 
-function computeRowSummary(grades: Record<string, number | null>, periodos: number) {
-  const avas = Array.from({ length: periodos }, (_, i) => grades[`p${i + 1}-AVA`] ?? null);
-  const rec = grades["p0-RECP"] ?? null;
-  const finalProva = grades["p0-FINAL"] ?? null;
+function computeRowSummary(grades: Record<string, number | null>, configs: AvaliacaoConfigRow[]) {
+  const periods = uniqueAVAPeriods(configs);
 
-  const present = avas.filter((v): v is number => v != null);
-  const totalPts = present.length > 0 ? present.reduce((x, y) => x + y, 0) : null;
-  let media: number | null = present.length > 0 ? present.reduce((x, y) => x + y, 0) / present.length : null;
-  if (media != null && rec != null) media = Math.max(media, rec);
-  if (media != null && finalProva != null) media = (media + finalProva) / 2;
+  const periodAverages = periods.map((p) => {
+    const pCfg = configs.filter((c) => c.periodo === p && !c.isRecuperacao && c.tipo !== "SEM_INFLUENCIA" && c.tipo !== "CONCEITO");
+    const vals = pCfg.map((c) => ({ score: grades[c.id] ?? null, peso: c.peso ?? 1 })).filter((v) => v.score != null);
+    if (vals.length === 0) return null;
+    const allEqual = pCfg.every((c) => c.peso == null);
+    if (allEqual) return vals.reduce((s, v) => s + v.score!, 0) / vals.length;
+    const totalPeso = vals.reduce((s, v) => s + v.peso, 0);
+    return totalPeso > 0 ? vals.reduce((s, v) => s + v.score! * v.peso, 0) / totalPeso : null;
+  });
+
+  const periodRecoveries = periods.map((p) => {
+    const rCfg = configs.filter((c) => c.periodo === p && c.isRecuperacao);
+    const vals = rCfg.map((c) => grades[c.id] ?? null).filter((v): v is number => v != null);
+    return vals.length > 0 ? Math.max(...vals) : null;
+  });
+
+  const recCfg = configs.filter((c) => c.periodo === 0 && c.isRecuperacao);
+  const globalRec = recCfg.map((c) => grades[c.id] ?? null).find((v): v is number => v != null) ?? null;
+
+  const pfCfg = configs.filter((c) => c.periodo === 0 && !c.isRecuperacao);
+  const globalPf = pfCfg.map((c) => grades[c.id] ?? null).find((v): v is number => v != null) ?? null;
+
+  const effectivePeriods = periodAverages.map((avg, i) => {
+    const rec = periodRecoveries[i];
+    if (avg == null && rec != null) return rec;
+    if (avg != null && rec != null) return Math.max(avg, rec);
+    return avg;
+  });
+
+  const present = effectivePeriods.filter((v): v is number => v != null);
+  const totalPts = present.length > 0 ? Math.round(present.reduce((a, b) => a + b, 0) * 100) / 100 : null;
+  let media: number | null = present.length > 0 ? present.reduce((a, b) => a + b, 0) / present.length : null;
+  if (media != null && globalRec != null) media = Math.max(media, globalRec);
+  if (media != null && globalPf != null) media = (media + globalPf) / 2;
 
   return {
-    avas,
-    rec,
-    finalProva,
+    periodAverages,
+    periodRecoveries,
+    globalRec,
+    globalPf,
     totalPts,
     media: media != null ? Math.round(media * 100) / 100 : null,
   };
 }
 
-/** Classe de cor por faixa de nota (igual ao gerador: ≥7 verde, ≥5 âmbar, <5 vermelho). */
+/** Classe de cor por faixa de nota (≥7 verde, ≥5 âmbar, <5 vermelho). */
 function gradeClass(v: number | null): string {
   if (v == null) return "n-em";
   if (v >= 7) return "n-ok";
@@ -131,16 +150,16 @@ function gradeClass(v: number | null): string {
   return "n-bad";
 }
 
-function studentResult(rows: BoletimStudent["rows"], periodos: number): string {
-  const medias = rows.map((r) => computeRowSummary(r.grades, periodos).media).filter((m): m is number => m != null);
+function studentResult(rows: BoletimStudent["rows"], configs: AvaliacaoConfigRow[]): string {
+  const medias = rows.map((r) => computeRowSummary(r.grades, configs).media).filter((m): m is number => m != null);
   if (medias.length === 0) return "Aluno Cursando";
   if (medias.some((m) => m < 5)) return "Reprovado";
   if (medias.some((m) => m < 7)) return "Em Recuperação";
   return "Aprovado";
 }
 
-function overallMedia(rows: BoletimStudent["rows"], periodos: number): number | null {
-  const medias = rows.map((r) => computeRowSummary(r.grades, periodos).media).filter((m): m is number => m != null);
+function overallMedia(rows: BoletimStudent["rows"], configs: AvaliacaoConfigRow[]): number | null {
+  const medias = rows.map((r) => computeRowSummary(r.grades, configs).media).filter((m): m is number => m != null);
   if (medias.length === 0) return null;
   return Math.round((medias.reduce((a, b) => a + b, 0) / medias.length) * 100) / 100;
 }
@@ -158,22 +177,29 @@ function gradeCell(v: number | null, extraClass = ""): string {
   return `<td class="td-nota ${gradeClass(v)} ${extraClass}">${fmt(v)}</td>`;
 }
 
-function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes, periodos: number): string {
+function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes): string {
+  const configs = data.configs;
+  const periods = uniqueAVAPeriods(configs);
+  const numPeriods = periods.length;
   const disciplinaNames = new Map(data.disciplinaOrder.map((d) => [d.id, d.name]));
-  const rows = frentes === "media" ? consolidateRows(student.rows, periodos, disciplinaNames) : student.rows;
+  const rows = frentes === "media" ? consolidateRows(student.rows, disciplinaNames) : student.rows;
   const totalAbsences = rows.reduce((sum, r) => sum + r.absences, 0);
   const freqPct = Math.max(0, Math.round((1 - totalAbsences / DIAS_LETIVOS) * 100));
-  const media = overallMedia(rows, periodos);
+  const media = overallMedia(rows, configs);
+  const ordinals = ["1ª","2ª","3ª","4ª"];
+
+  const hasGlobalRec = configs.some((c) => c.periodo === 0 && c.isRecuperacao);
+  const hasGlobalPf = configs.some((c) => c.periodo === 0 && !c.isRecuperacao);
 
   const rowsHtml = rows.map((r) => {
-    const s = computeRowSummary(r.grades, periodos);
+    const s = computeRowSummary(r.grades, configs);
     const discCls = r.isFrente ? "td-disc td-frente" : "td-disc";
     return `<tr>
       <td class="${discCls}">${esc(r.name)}</td>
-      ${s.avas.map((v) => gradeCell(v)).join("")}
-      ${gradeCell(s.rec)}
+      ${s.periodAverages.map((v) => gradeCell(v)).join("")}
+      ${hasGlobalRec ? gradeCell(s.globalRec) : ""}
       <td class="td-num">${s.totalPts != null ? fmt(s.totalPts) : ""}</td>
-      ${gradeCell(s.finalProva)}
+      ${hasGlobalPf ? gradeCell(s.globalPf) : ""}
       ${gradeCell(s.media, "td-media")}
       <td class="td-num">${r.absences || 0}</td>
     </tr>`;
@@ -218,10 +244,10 @@ function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolH
       <thead>
         <tr>
           <th class="th-disc">DISCIPLINAS</th>
-          ${Array.from({ length: periodos }, (_, i) => `<th>${["1ª","2ª","3ª","4ª"][i]} AVA<br><span style="font-weight:normal;font-size:8px">${periodLabel(i + 1, periodos)}</span></th>`).join("")}
-          <th>REC</th>
+          ${periods.map((p, i) => `<th>${ordinals[i] ?? `${p}ª`} AVA<br><span style="font-weight:normal;font-size:8px">${periodLabel(p, numPeriods)}</span></th>`).join("")}
+          ${hasGlobalRec ? "<th>REC</th>" : ""}
           <th>TOTAL PTS</th>
-          <th>PROVA FINAL</th>
+          ${hasGlobalPf ? "<th>PROVA FINAL</th>" : ""}
           <th>MÉDIA FINAL</th>
           <th>FALTAS</th>
         </tr>
@@ -231,7 +257,7 @@ function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolH
 
     <div class="bol-rodape">
       <div class="bol-rodape-resultado">
-        <strong>RESULTADO FINAL:</strong> ${studentResult(rows, periodos)}
+        <strong>RESULTADO FINAL:</strong> ${studentResult(rows, configs)}
         &nbsp;&nbsp;&nbsp;
         <strong>FALTAS ACUMULADAS:</strong> ${totalAbsences}
         &nbsp;&nbsp;&nbsp;
@@ -294,8 +320,8 @@ const BOL_CSS = `
   .bol-rodape-media { font-size: 12px; font-weight: bold; }
 `;
 
-export function buildBoletimHtml(data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes = "avulsas", periodos = 3): string {
-  const pages = data.students.map((s) => studentCard(s, data, school, frentes, periodos)).join('<div class="page-break"></div>');
+export function buildBoletimHtml(data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes = "avulsas"): string {
+  const pages = data.students.map((s) => studentCard(s, data, school, frentes)).join('<div class="page-break"></div>');
   return `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8"><style>${BOL_CSS}</style></head>
 <body>${pages}</body></html>`;
@@ -311,9 +337,9 @@ function cccEtapaLabel(turmaCode: string): string {
   return "";
 }
 
-function cccPeriodName(i: number, periodos: number): string {
-  if (periodos === 2) return `${i}º Semestre`;
-  if (periodos === 4) return `${i}º Bimestre`;
+function cccPeriodName(i: number, numPeriods: number): string {
+  if (numPeriods === 2) return `${i}º Semestre`;
+  if (numPeriods === 4) return `${i}º Bimestre`;
   return `${i}º Trimestre`;
 }
 
@@ -322,51 +348,33 @@ function cccGradeCell(v: number | null): string {
   return `<td class="ccc-td-nota ${cls}">${v != null ? v.toFixed(1).replace(".", ",") : "-"}</td>`;
 }
 
-function cccStudentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes, periodos: number): string {
+function cccStudentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes): string {
+  const configs = data.configs;
+  const periods = uniqueAVAPeriods(configs);
+  const numPeriods = periods.length;
   const disciplinaNames = new Map(data.disciplinaOrder.map((d) => [d.id, d.name]));
-  const rows = frentes === "media" ? consolidateRows(student.rows, periodos, disciplinaNames) : student.rows;
+  const rows = frentes === "media" ? consolidateRows(student.rows, disciplinaNames) : student.rows;
 
-  // Per-period effective AVA: max(ava, per-period recp) if recp entered
-  function effectiveAva(grades: Record<string, number | null>, i: number): number | null {
-    const ava = grades[`p${i}-AVA`] ?? null;
-    const recp = grades[`p${i}-RECP`] ?? null;
-    if (ava == null) return null;
-    return recp != null ? Math.max(ava, recp) : ava;
-  }
-
-  function mediaFinal(grades: Record<string, number | null>): number | null {
-    const effAvas = Array.from({ length: periodos }, (_, i) => effectiveAva(grades, i + 1));
-    const present = effAvas.filter((v): v is number => v != null);
-    if (present.length === 0) return null;
-    let med = present.reduce((a, b) => a + b, 0) / present.length;
-    const recpFinal = grades["p0-RECP"] ?? null;
-    if (recpFinal != null) med = Math.max(med, recpFinal);
-    return Math.round(med * 100) / 100;
-  }
-
-  const periodHeaders = Array.from({ length: periodos }, (_, i) =>
-    `<th colspan="3" class="ccc-th-group">${cccPeriodName(i + 1, periodos)}</th>`
+  const periodHeaders = periods.map((p) =>
+    `<th colspan="3" class="ccc-th-group">${cccPeriodName(p, numPeriods)}</th>`
   ).join("");
 
-  const periodSubHeaders = Array.from({ length: periodos }, () =>
+  const periodSubHeaders = periods.map(() =>
     `<th class="ccc-th-sub">Média<br>Trimestral</th><th class="ccc-th-sub">Média<br>Recuper.</th><th class="ccc-th-sub">Faltas</th>`
   ).join("");
 
   const rowsHtml = rows.map((r) => {
+    const s = computeRowSummary(r.grades, configs);
     const discCls = r.isFrente ? "ccc-td-disc ccc-td-frente" : "ccc-td-disc";
-    const recpFinal = r.grades["p0-RECP"] ?? null;
-    const mf = mediaFinal(r.grades);
-    const periodCells = Array.from({ length: periodos }, (_, i) => {
-      const ava = r.grades[`p${i + 1}-AVA`] ?? null;
-      const recp = r.grades[`p${i + 1}-RECP`] ?? null;
-      return `${cccGradeCell(ava)}${cccGradeCell(recp)}<td class="ccc-td-falta">-</td>`;
-    }).join("");
+    const periodCells = periods.map((_, i) =>
+      `${cccGradeCell(s.periodAverages[i] ?? null)}${cccGradeCell(s.periodRecoveries[i] ?? null)}<td class="ccc-td-falta">-</td>`
+    ).join("");
     return `<tr>
       <td class="${discCls}">${esc(r.name)}</td>
       ${periodCells}
-      ${cccGradeCell(recpFinal)}
+      ${cccGradeCell(s.globalRec)}
       <td class="ccc-td-falta">${r.absences || 0}</td>
-      ${cccGradeCell(mf)}
+      ${cccGradeCell(s.media)}
     </tr>`;
   }).join("");
 
@@ -375,21 +383,17 @@ function cccStudentCard(student: BoletimStudent, data: BoletimData, school: Scho
     ? `<img src="${esc(school.logoUrl)}" alt="Logo" class="ccc-logo-img">`
     : "";
 
-  const overallMed = (() => {
-    const meds = rows.map((r) => mediaFinal(r.grades)).filter((v): v is number => v != null);
-    if (meds.length === 0) return null;
-    return Math.round((meds.reduce((a, b) => a + b, 0) / meds.length) * 100) / 100;
-  })();
 
   const resultado = (() => {
-    const meds = rows.map((r) => mediaFinal(r.grades)).filter((v): v is number => v != null);
+    const meds = rows.map((r) => computeRowSummary(r.grades, configs).media).filter((v): v is number => v != null);
     if (meds.length === 0) return "";
     if (meds.some((m) => m < 5)) return "Reprovado";
     if (meds.some((m) => m < 6)) return "Em Recuperação";
     return "Aprovado";
   })();
 
-  const totalFaltas = rows.reduce((s, r) => s + r.absences, 0);
+  const periodWord = numPeriods === 2 ? "semestre" : numPeriods === 4 ? "bimestre" : "trimestre";
+  const periodWordNum = ["dois","três","quatro"][numPeriods - 2] ?? String(numPeriods);
 
   return `<div class="ccc-bol">
     <div class="ccc-hdr">
@@ -436,7 +440,7 @@ function cccStudentCard(student: BoletimStudent, data: BoletimData, school: Scho
 
     <div class="ccc-notas">
       <p>1. Todo aluno que obtiver média final mínima 6,0 (seis) em todas as disciplinas e frequência igual ou superior a 75% será considerado promovido.</p>
-      <p>2. A média final será calculada considerando peso um para cada ${periodos === 2 ? "semestre" : periodos === 4 ? "bimestre" : "trimestre"}. A somatória dos resultados será dividida por ${periodos} (${["dois","três","quatro"][periodos - 2] ?? periodos}).</p>
+      <p>2. A média final será calculada considerando peso um para cada ${periodWord}. A somatória dos resultados será dividida por ${numPeriods} (${periodWordNum}).</p>
       <p>3. Terá direito a processo de recuperação o aluno que obtiver média final inferior a 6,0 (seis) em até 3 (três) disciplinas.</p>
       <p>4. Será considerado retido o aluno que, após a recuperação, não obtiver média igual ou superior a 6,0 (seis) nas disciplinas.</p>
       <p>5. EA = Em adaptação. &nbsp;&nbsp; 6. NF = Não frequentou.</p>
@@ -447,6 +451,7 @@ function cccStudentCard(student: BoletimStudent, data: BoletimData, school: Scho
       Autorização de cursos: Ensino Fundamental – anos finais (6º ao 9º ano) e Ensino Médio: Processo Seduc-PRC-2019/02962, de 09/09/2019. Publicação em D.O.E. 20/11/2019, Seção I, página 22
     </div>
   </div>`;
+
 }
 
 const CCC_CSS = `
@@ -497,8 +502,8 @@ const CCC_CSS = `
   .ccc-autorizacao { border-top: 1px solid #ccc; padding: 3px 8px; font-size: 7px; color: #555; line-height: 1.5; }
 `;
 
-export function buildBoletimHtmlCCC(data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes = "avulsas", periodos = 3): string {
-  const pages = data.students.map((s) => cccStudentCard(s, data, school, frentes, periodos)).join('<div class="page-break"></div>');
+export function buildBoletimHtmlCCC(data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes = "avulsas"): string {
+  const pages = data.students.map((s) => cccStudentCard(s, data, school, frentes)).join('<div class="page-break"></div>');
   return `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8"><style>${CCC_CSS}</style></head>
 <body>${pages}</body></html>`;

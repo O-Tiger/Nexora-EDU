@@ -1,6 +1,6 @@
 import { prisma } from "../client";
-import type { GradeKind } from "@prisma/client";
 import { getFaltasFromDiario } from "./diario";
+import type { AvaliacaoConfigRow } from "./avaliacoes";
 
 // ─── Disciplinas ───────────────────────────────────────────────────────────────
 
@@ -207,18 +207,16 @@ export async function upsertGrade(data: {
   tenantId: string;
   enrollmentId: string;
   disciplinaId: string;
-  period: number;
-  kind: GradeKind;
+  avaliacaoConfigId: string;
   score: number | null;
   updatedBy: string;
 }) {
   return prisma.grade.upsert({
     where: {
-      enrollmentId_disciplinaId_period_kind: {
+      enrollmentId_disciplinaId_avaliacaoConfigId: {
         enrollmentId: data.enrollmentId,
         disciplinaId: data.disciplinaId,
-        period: data.period,
-        kind: data.kind,
+        avaliacaoConfigId: data.avaliacaoConfigId,
       },
     },
     create: data,
@@ -248,7 +246,7 @@ export type BoletimDisciplinaRow = {
   name: string;
   isFrente: boolean;
   parentId: string | null;
-  grades: Record<string, number | null>; // chave "p{period}-{kind}"
+  grades: Record<string, number | null>; // chave = avaliacaoConfigId
   absences: number;
 };
 
@@ -269,6 +267,7 @@ export type BoletimData = {
     year: number;
   };
   disciplinaOrder: { id: string; name: string; isFrente: boolean; parentId: string | null }[];
+  configs: AvaliacaoConfigRow[];
   students: BoletimStudent[];
 };
 
@@ -333,7 +332,7 @@ export async function getBoletimData(
   }
 
   const enrollmentIds = turma.enrollments.map((e) => e.id);
-  const [grades, attendances, faltasDiario, diarioCount, enrollmentFrentesRaw] = await Promise.all([
+  const [grades, attendances, faltasDiario, diarioCount, enrollmentFrentesRaw, configs] = await Promise.all([
     prisma.grade.findMany({ where: { tenantId, enrollmentId: { in: enrollmentIds } } }),
     prisma.attendance.findMany({ where: { tenantId, enrollmentId: { in: enrollmentIds } } }),
     getFaltasFromDiario(tenantId, turmaId),
@@ -344,6 +343,7 @@ export async function getBoletimData(
           select: { enrollmentId: true, disciplinaId: true, frenteId: true },
         })
       : Promise.resolve([]),
+    prisma.avaliacaoConfig.findMany({ where: { tenantId }, orderBy: { ordem: "asc" } }),
   ]);
   // `${enrollmentId}|${parentId}` → frenteId
   const efMap = new Map<string, string>();
@@ -356,7 +356,7 @@ export async function getBoletimData(
       const cellGrades: Record<string, number | null> = {};
       for (const g of grades) {
         if (g.enrollmentId === enr.id && g.disciplinaId === d.id) {
-          cellGrades[`p${g.period}-${g.kind}`] = g.score ?? null;
+          cellGrades[g.avaliacaoConfigId] = g.score ?? null;
         }
       }
       const att = attendances.find((a) => a.enrollmentId === enr.id && a.disciplinaId === d.id);
@@ -404,6 +404,7 @@ export async function getBoletimData(
       year: turma.anoLetivo.year,
     },
     disciplinaOrder: orderedDisciplinas,
+    configs,
     students,
   };
 }

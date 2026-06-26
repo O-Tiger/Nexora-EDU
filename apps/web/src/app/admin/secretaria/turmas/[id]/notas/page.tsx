@@ -6,7 +6,7 @@ import { ArrowLeft, FileText } from "lucide-react";
 import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
 import { getDisciplinas, getTurmaDisciplinas, getEnrollmentFrentes } from "@nexora/db/src/queries/pedagogico";
-import { getTenantConfig } from "@nexora/db/src/queries/administracao";
+import { getAvaliacoesConfig } from "@nexora/db/src/queries/avaliacoes";
 import { NotasGrid } from "@/components/secretaria/notas-grid";
 import { ItinerarioPanel } from "@/components/secretaria/itinerario-panel";
 
@@ -30,12 +30,11 @@ export default async function NotasPage({ params }: { params: Promise<{ id: stri
   });
   if (!turma) notFound();
 
-  const [allDisciplinas, assigned, tenantConfig] = await Promise.all([
+  const [allDisciplinas, assigned, avaliacoesConfig] = await Promise.all([
     getDisciplinas(tenantId),
     getTurmaDisciplinas(tenantId, turmaId),
-    getTenantConfig(tenantId),
+    getAvaliacoesConfig(tenantId),
   ]);
-  const periodos = tenantConfig?.periodos ?? 3;
 
   const enrollmentIds = turma.enrollments.map((e) => e.id);
   const [grades, attendances] = await Promise.all([
@@ -68,7 +67,32 @@ export default async function NotasPage({ params }: { params: Promise<{ id: stri
     ...d.frentes.map((f) => ({ id: f.id, name: `${d.name} › ${f.name}`, isFrente: true })),
   ]);
 
-  const assignedFlat = assigned.map((d) => ({ id: d.id, name: d.name, parentId: d.parentId }));
+  // Build discWithFrentes: group assigned frentes under their parent
+  // Parents without frentes assigned appear as standalone entries
+  const parentMap = new Map(allDisciplinas.map((d) => [d.id, d]));
+  const assignedParentIds = new Set<string>();
+  const frentesByParent = new Map<string, { id: string; name: string }[]>();
+  for (const d of assigned) {
+    if (d.parentId) {
+      assignedParentIds.add(d.parentId);
+      const arr = frentesByParent.get(d.parentId) ?? [];
+      arr.push({ id: d.id, name: d.name });
+      frentesByParent.set(d.parentId, arr);
+    }
+  }
+  const discWithFrentes = [
+    // Parents that have frentes assigned (show frente group)
+    ...[...assignedParentIds].map((parentId) => {
+      const parent = parentMap.get(parentId);
+      return {
+        id: parentId,
+        name: parent?.name ?? parentId,
+        frentes: (frentesByParent.get(parentId) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    }),
+    // Non-frente disciplines assigned directly
+    ...assigned.filter((d) => !d.parentId).map((d) => ({ id: d.id, name: d.name, frentes: [] as { id: string; name: string }[] })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
 
   const students = turma.enrollments.map((e) => ({ enrollmentId: e.id, name: e.student.name }));
 
@@ -105,11 +129,11 @@ export default async function NotasPage({ params }: { params: Promise<{ id: stri
         turmaId={turmaId}
         students={students}
         allDisciplinas={allFlat}
-        assignedIds={assignedFlat.map((d) => d.id)}
-        assignedDisciplinas={assignedFlat.map((d) => ({ id: d.id, name: d.name }))}
-        grades={grades.map((g) => ({ enrollmentId: g.enrollmentId, disciplinaId: g.disciplinaId, period: g.period, kind: g.kind, score: g.score }))}
+        assignedIds={assigned.map((d) => d.id)}
+        discWithFrentes={discWithFrentes}
+        grades={grades.map((g) => ({ enrollmentId: g.enrollmentId, disciplinaId: g.disciplinaId, avaliacaoConfigId: g.avaliacaoConfigId, score: g.score }))}
         attendances={attendances.map((a) => ({ enrollmentId: a.enrollmentId, disciplinaId: a.disciplinaId, absences: a.absences }))}
-        periodos={periodos}
+        avaliacoesConfig={avaliacoesConfig}
         itinerarioFrenteOf={itinerarioFrenteOf}
         enrollmentFrentes={enrollmentFrentesRows}
       />

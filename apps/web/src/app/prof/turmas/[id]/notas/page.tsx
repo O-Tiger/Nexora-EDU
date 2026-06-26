@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@nexora/ui";
 import { prisma } from "@nexora/db";
 import { getProfessorByUserId } from "@nexora/db/src/queries/professores";
-import { getTenantConfig } from "@nexora/db/src/queries/administracao";
+import { getAvaliacoesConfig } from "@nexora/db/src/queries/avaliacoes";
 import { NotasGrid } from "@/components/secretaria/notas-grid";
 
 export const metadata: Metadata = { title: "Lançar notas" };
@@ -21,7 +21,7 @@ export default async function ProfNotasPage({ params }: { params: Promise<{ id: 
   const professor = await getProfessorByUserId(userId, tenantId);
   if (!professor) redirect("/unauthorized");
 
-  const [turma, myVinculos, tenantConfig] = await Promise.all([
+  const [turma, myVinculos, avaliacoesConfig] = await Promise.all([
     prisma.turma.findFirst({
       where: { id: turmaId, tenantId },
       include: {
@@ -36,15 +36,35 @@ export default async function ProfNotasPage({ params }: { params: Promise<{ id: 
       where: { tenantId, turmaId, professorId: professor.id },
       include: { disciplina: { select: { id: true, name: true, parentId: true } } },
     }),
-    getTenantConfig(tenantId),
+    getAvaliacoesConfig(tenantId),
   ]);
-  const periodos = tenantConfig?.periodos ?? 3;
 
   if (!turma) notFound();
   if (myVinculos.length === 0) redirect(`/prof/turmas/${turmaId}`);
 
-  const myDisciplinas = myVinculos.map((v) => ({ id: v.disciplina.id, name: v.disciplina.name }));
-  const myIds = myDisciplinas.map((d) => d.id);
+  // Prof: frentes already individually assigned — group them by parentId
+  const frentesByParent = new Map<string, { id: string; name: string }[]>();
+  const standaloneDiscs: { id: string; name: string }[] = [];
+  for (const v of myVinculos) {
+    const d = v.disciplina;
+    if (d.parentId) {
+      const arr = frentesByParent.get(d.parentId) ?? [];
+      arr.push({ id: d.id, name: d.name });
+      frentesByParent.set(d.parentId, arr);
+    } else {
+      standaloneDiscs.push({ id: d.id, name: d.name });
+    }
+  }
+  const discWithFrentes = [
+    ...[...frentesByParent.entries()].map(([parentId, frentes]) => ({
+      id: parentId,
+      name: frentes[0]?.name.replace(/ \d+$/, "") ?? parentId,
+      frentes: frentes.sort((a, b) => a.name.localeCompare(b.name)),
+    })),
+    ...standaloneDiscs.map((d) => ({ ...d, frentes: [] as { id: string; name: string }[] })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+
+  const myIds = myVinculos.map((v) => v.disciplina.id);
   const enrollmentIds = turma.enrollments.map((e) => e.id);
 
   const [grades, attendances] = await Promise.all([
@@ -69,11 +89,11 @@ export default async function ProfNotasPage({ params }: { params: Promise<{ id: 
         students={turma.enrollments.map((e) => ({ enrollmentId: e.id, name: e.student.name }))}
         allDisciplinas={[]}
         assignedIds={myIds}
-        assignedDisciplinas={myDisciplinas}
-        grades={grades.map((g) => ({ enrollmentId: g.enrollmentId, disciplinaId: g.disciplinaId, period: g.period, kind: g.kind, score: g.score }))}
+        discWithFrentes={discWithFrentes}
+        grades={grades.map((g) => ({ enrollmentId: g.enrollmentId, disciplinaId: g.disciplinaId, avaliacaoConfigId: g.avaliacaoConfigId, score: g.score }))}
         attendances={attendances.map((a) => ({ enrollmentId: a.enrollmentId, disciplinaId: a.disciplinaId, absences: a.absences }))}
+        avaliacoesConfig={avaliacoesConfig}
         canManageDisciplinas={false}
-        periodos={periodos}
       />
     </div>
   );

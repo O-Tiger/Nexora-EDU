@@ -43,7 +43,6 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Nenhum aluno ativo na turma" }, { status: 400 });
   }
 
-  const periodos = tenantConfig?.periodos ?? 3;
   const schoolHeader = {
     name: tenantConfig?.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || BRAND.name,
     ...(tenantConfig?.cnpj && { cnpj: tenantConfig.cnpj }),
@@ -51,8 +50,8 @@ export async function GET(req: Request) {
     ...(tenantConfig?.logoUrl && { logoUrl: tenantConfig.logoUrl }),
   };
   const html = template === "ccc"
-    ? buildBoletimHtmlCCC(data, schoolHeader, frentes, periodos)
-    : buildBoletimHtml(data, schoolHeader, frentes, periodos);
+    ? buildBoletimHtmlCCC(data, schoolHeader, frentes)
+    : buildBoletimHtml(data, schoolHeader, frentes);
 
   let rendered;
   try {

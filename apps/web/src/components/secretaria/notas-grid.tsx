@@ -1,84 +1,64 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition } from "react";
 import { Button, toast } from "@nexora/ui";
 import { Settings2, Check } from "lucide-react";
 import { saveGradeAction, saveAttendanceAction, setTurmaDisciplinasAction } from "@/actions/pedagogico";
-import type { GradeKind } from "@nexora/db";
+
+interface AvaliacaoConfigCol {
+  id: string;
+  sigla: string;
+  label: string;
+  periodo: number;
+}
 
 interface Student { enrollmentId: string; name: string }
 interface DiscOption { id: string; name: string; isFrente: boolean }
-interface GradeCell { enrollmentId: string; disciplinaId: string; period: number; kind: GradeKind; score: number | null }
+interface GradeCell { enrollmentId: string; disciplinaId: string; avaliacaoConfigId: string; score: number | null }
 interface AttCell { enrollmentId: string; disciplinaId: string; absences: number }
-
 interface EnrollmentFrenteRow { enrollmentId: string; disciplinaId: string; frenteId: string; frenteName: string }
+
+/** Parent discipline with its frentes that are assigned to this turma */
+interface DiscWithFrentes {
+  id: string;
+  name: string;
+  frentes: { id: string; name: string }[];
+}
 
 interface Props {
   turmaId: string;
   students: Student[];
   allDisciplinas: DiscOption[];
   assignedIds: string[];
-  assignedDisciplinas: { id: string; name: string }[];
+  /** Parent + frentes structure for the grade grid */
+  discWithFrentes: DiscWithFrentes[];
   grades: GradeCell[];
   attendances: AttCell[];
+  avaliacoesConfig: AvaliacaoConfigCol[];
   canManageDisciplinas?: boolean;
-  /** 2 = semestral, 3 = trimestral, 4 = bimestral */
-  periodos?: number;
-  /** Quando true, mostra coluna de Recuperação por período (layout CCC) */
-  recpPerPeriod?: boolean;
-  /** frenteId → parentId, only for frentes of isItinerario parents */
   itinerarioFrenteOf?: Record<string, string>;
-  /** enrollment frente assignments for itinerário disciplines */
   enrollmentFrentes?: EnrollmentFrenteRow[];
 }
 
-function buildColumns(periodos: number, recpPerPeriod: boolean): { key: string; label: string; period: number; kind: GradeKind }[] {
-  const ordinals = ["1ª", "2ª", "3ª", "4ª"];
-  if (recpPerPeriod) {
-    // CCC mode: [AVA T1, REC T1, AVA T2, REC T2, ...] + Recuper. Final
-    const cols: { key: string; label: string; period: number; kind: GradeKind }[] = [];
-    for (let i = 0; i < periodos; i++) {
-      cols.push({ key: `${i + 1}-AVA`, label: `${ordinals[i]} Méd.`, period: i + 1, kind: "AVA" });
-      cols.push({ key: `${i + 1}-RECP`, label: `${ordinals[i]} Rec.`, period: i + 1, kind: "RECP" });
-    }
-    cols.push({ key: "0-RECP", label: "Rec. Final", period: 0, kind: "RECP" });
-    return cols;
-  }
-  const ava = Array.from({ length: periodos }, (_, i) => ({
-    key: `${i + 1}-AVA`,
-    label: `${ordinals[i]} AVA`,
-    period: i + 1,
-    kind: "AVA" as GradeKind,
-  }));
-  return [
-    ...ava,
-    { key: "0-RECP", label: "REC", period: 0, kind: "RECP" as GradeKind },
-    { key: "0-FINAL", label: "Prova Final", period: 0, kind: "FINAL" as GradeKind },
-  ];
-}
-
 export function NotasGrid(props: Props) {
-  const { turmaId, students, allDisciplinas, assignedDisciplinas, canManageDisciplinas = true,
-    periodos = 3, recpPerPeriod = false, itinerarioFrenteOf = {}, enrollmentFrentes = [] } = props;
+  const {
+    turmaId, students, allDisciplinas, discWithFrentes, canManageDisciplinas = true,
+    avaliacoesConfig, itinerarioFrenteOf = {}, enrollmentFrentes = [],
+  } = props;
 
-  const COLUMNS = useMemo(() => buildColumns(periodos, recpPerPeriod), [periodos, recpPerPeriod]);
-
-  // Map `${enrollmentId}|${parentId}` → frenteId for itinerário lookup
   const efMap = new Map<string, string>();
   for (const r of enrollmentFrentes) efMap.set(`${r.enrollmentId}|${r.disciplinaId}`, r.frenteId);
-
-  // Map frenteId → frenteName
   const frenteNameMap = new Map<string, string>();
   for (const r of enrollmentFrentes) frenteNameMap.set(r.frenteId, r.frenteName);
+
   const [assigned, setAssigned] = useState<Set<string>>(new Set(props.assignedIds));
-  const [showAssign, setShowAssign] = useState(assignedDisciplinas.length === 0);
-  const [selectedDisc, setSelectedDisc] = useState<string>(assignedDisciplinas[0]?.id ?? "");
+  const [showAssign, setShowAssign] = useState(discWithFrentes.length === 0);
+  const [selectedDiscId, setSelectedDiscId] = useState<string>(discWithFrentes[0]?.id ?? "");
   const [isPending, startTransition] = useTransition();
 
-  // Mapa de notas em estado local: key `${enr}|${disc}|${period}-${kind}` → score
   const [grades, setGrades] = useState<Map<string, number | null>>(() => {
     const m = new Map<string, number | null>();
-    for (const g of props.grades) m.set(`${g.enrollmentId}|${g.disciplinaId}|${g.period}-${g.kind}`, g.score);
+    for (const g of props.grades) m.set(`${g.enrollmentId}|${g.disciplinaId}|${g.avaliacaoConfigId}`, g.score);
     return m;
   });
   const [absences, setAbsences] = useState<Map<string, number>>(() => {
@@ -86,11 +66,6 @@ export function NotasGrid(props: Props) {
     for (const a of props.attendances) m.set(`${a.enrollmentId}|${a.disciplinaId}`, a.absences);
     return m;
   });
-
-  const assignedList = useMemo(
-    () => allDisciplinas.filter((d) => assigned.has(d.id)),
-    [allDisciplinas, assigned],
-  );
 
   function toggleAssign(id: string) {
     setAssigned((prev) => {
@@ -106,13 +81,11 @@ export function NotasGrid(props: Props) {
       await setTurmaDisciplinasAction(turmaId, ids);
       toast({ title: "Disciplinas da turma atualizadas" });
       setShowAssign(false);
-      if (!ids.includes(selectedDisc)) setSelectedDisc(ids[0] ?? "");
     });
   }
 
-  function onGradeBlur(enrollmentId: string, period: number, kind: GradeKind, raw: string) {
-    if (!selectedDisc) return;
-    const key = `${enrollmentId}|${selectedDisc}|${period}-${kind}`;
+  function onGradeBlur(enrollmentId: string, disciplinaId: string, avaliacaoConfigId: string, raw: string) {
+    const key = `${enrollmentId}|${disciplinaId}|${avaliacaoConfigId}`;
     const score = raw.trim() === "" ? null : Number(raw.replace(",", "."));
     if (score != null && (isNaN(score) || score < 0 || score > 10)) {
       toast({ variant: "destructive", title: "Nota inválida", description: "Use valores de 0 a 10." });
@@ -120,41 +93,48 @@ export function NotasGrid(props: Props) {
     }
     setGrades((prev) => new Map(prev).set(key, score));
     startTransition(async () => {
-      await saveGradeAction({ enrollmentId, disciplinaId: selectedDisc, period, kind, score });
+      await saveGradeAction({ enrollmentId, disciplinaId, avaliacaoConfigId, score });
     });
   }
 
-  function onAbsenceBlur(enrollmentId: string, raw: string) {
-    if (!selectedDisc) return;
-    const key = `${enrollmentId}|${selectedDisc}`;
-    const absences = raw.trim() === "" ? 0 : Math.floor(Number(raw));
-    if (isNaN(absences) || absences < 0) return;
-    setAbsences((prev) => new Map(prev).set(key, absences));
+  function onAbsenceBlur(enrollmentId: string, disciplinaId: string, raw: string) {
+    const key = `${enrollmentId}|${disciplinaId}`;
+    const absencesVal = raw.trim() === "" ? 0 : Math.floor(Number(raw));
+    if (isNaN(absencesVal) || absencesVal < 0) return;
+    setAbsences((prev) => new Map(prev).set(key, absencesVal));
     startTransition(async () => {
-      await saveAttendanceAction({ enrollmentId, disciplinaId: selectedDisc, absences });
+      await saveAttendanceAction({ enrollmentId, disciplinaId, absences: absencesVal });
     });
   }
+
+  const selectedDisc = discWithFrentes.find((d) => d.id === selectedDiscId);
+  // When selected disc has frentes, show them; otherwise treat the disc itself as the single column
+  const activeTargets: { id: string; name: string }[] = selectedDisc
+    ? (selectedDisc.frentes.length > 0 ? selectedDisc.frentes : [{ id: selectedDisc.id, name: selectedDisc.name }])
+    : [];
+
+  const hasFrentes = (selectedDisc?.frentes.length ?? 0) > 0;
 
   return (
     <div className="space-y-4">
       {/* Disciplinas da turma */}
       <div className="rounded-lg border border-navy-100 bg-white">
         {canManageDisciplinas && (
-        <button
-          onClick={() => setShowAssign((v) => !v)}
-          className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-navy-800 hover:bg-navy-50"
-        >
-          <span className="flex items-center gap-2">
-            <Settings2 className="h-4 w-4 text-teal-500" />
-            Disciplinas da turma ({assignedList.length})
-          </span>
-          <span className="text-xs text-teal-600">{showAssign ? "Fechar" : "Configurar"}</span>
-        </button>
+          <button
+            onClick={() => setShowAssign((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-navy-800 hover:bg-navy-50"
+          >
+            <span className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4 text-teal-500" />
+              Disciplinas da turma ({discWithFrentes.length})
+            </span>
+            <span className="text-xs text-teal-600">{showAssign ? "Fechar" : "Configurar"}</span>
+          </button>
         )}
 
         {canManageDisciplinas && showAssign && (
           <div className="border-t border-navy-100 p-4 space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 max-h-72 overflow-y-auto">
+            <div className="grid grid-cols-1 gap-y-1 max-h-72 overflow-y-auto">
               {allDisciplinas.map((d) => (
                 <label key={d.id} className={`flex items-center gap-2 text-sm cursor-pointer ${d.isFrente ? "pl-4 text-navy-500" : "text-navy-800"}`}>
                   <input type="checkbox" checked={assigned.has(d.id)} onChange={() => toggleAssign(d.id)} />
@@ -162,9 +142,7 @@ export function NotasGrid(props: Props) {
                 </label>
               ))}
               {allDisciplinas.length === 0 && (
-                <p className="text-sm text-navy-400 col-span-2">
-                  Nenhuma disciplina cadastrada. Crie em Disciplinas primeiro.
-                </p>
+                <p className="text-sm text-navy-400">Nenhuma disciplina cadastrada.</p>
               )}
             </div>
             <Button size="sm" onClick={saveAssignments} disabled={isPending} className="gap-2">
@@ -174,77 +152,107 @@ export function NotasGrid(props: Props) {
         )}
       </div>
 
-      {assignedList.length > 0 && (
+      {discWithFrentes.length > 0 && (
         <>
-          {/* Seletor de disciplina */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-medium text-navy-500">Disciplina:</span>
             <select
-              value={selectedDisc}
-              onChange={(e) => setSelectedDisc(e.target.value)}
+              value={selectedDiscId}
+              onChange={(e) => setSelectedDiscId(e.target.value)}
               className="rounded-md border border-navy-200 px-3 py-1.5 text-sm"
             >
-              {assignedList.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              {discWithFrentes.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
             </select>
           </div>
 
-          {/* Grade de notas */}
           {selectedDisc && (
             <div className="overflow-x-auto rounded-lg border border-navy-100 bg-white">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-navy-100 bg-navy-50 text-xs text-navy-500">
-                    <th className="px-3 py-2 text-left font-semibold sticky left-0 bg-navy-50">Aluno</th>
-                    {COLUMNS.map((c) => <th key={c.key} className="px-2 py-2 font-semibold w-16">{c.label}</th>)}
-                    <th className="px-2 py-2 font-semibold w-16">Faltas</th>
-                  </tr>
+                  {hasFrentes ? (
+                    <>
+                      {/* Row 1: Frente names spanning avaliação cols */}
+                      <tr className="border-b border-navy-100 bg-navy-50 text-xs text-navy-500">
+                        <th className="px-3 py-2 text-left font-semibold sticky left-0 bg-navy-50" rowSpan={2}>Aluno</th>
+                        {activeTargets.map((t) => (
+                          <th key={t.id} colSpan={avaliacoesConfig.length} className="px-2 py-1 font-semibold text-center border-l border-navy-200">
+                            {t.name}
+                          </th>
+                        ))}
+                        <th className="px-2 py-1 font-semibold" rowSpan={2}>Faltas</th>
+                      </tr>
+                      {/* Row 2: Avaliação siglas repeated per frente */}
+                      <tr className="border-b border-navy-100 bg-navy-50 text-xs text-navy-500">
+                        {activeTargets.map((t) =>
+                          avaliacoesConfig.map((c) => (
+                            <th key={`${t.id}-${c.id}`} className="px-2 py-1 font-semibold w-14 border-l first:border-l-0 border-navy-100" title={c.label}>
+                              {c.sigla}
+                            </th>
+                          ))
+                        )}
+                      </tr>
+                    </>
+                  ) : (
+                    <tr className="border-b border-navy-100 bg-navy-50 text-xs text-navy-500">
+                      <th className="px-3 py-2 text-left font-semibold sticky left-0 bg-navy-50">Aluno</th>
+                      {avaliacoesConfig.map((c) => (
+                        <th key={c.id} className="px-2 py-2 font-semibold w-16" title={c.label}>{c.sigla}</th>
+                      ))}
+                      <th className="px-2 py-2 font-semibold w-16">Faltas</th>
+                    </tr>
+                  )}
                 </thead>
-                <tbody key={selectedDisc} className="divide-y divide-navy-50">
+                <tbody key={selectedDiscId} className="divide-y divide-navy-50">
                   {students.map((s) => {
-                    // Itinerário locking: if selectedDisc is a frente of an itinerário parent,
-                    // only allow editing for students whose assigned frente matches selectedDisc
-                    const itinerarioParentId = itinerarioFrenteOf[selectedDisc];
+                    const itinerarioParentId = itinerarioFrenteOf[selectedDiscId];
                     const studentFrenteId = itinerarioParentId
                       ? efMap.get(`${s.enrollmentId}|${itinerarioParentId}`)
                       : undefined;
-                    const isLocked = itinerarioParentId !== undefined && studentFrenteId !== selectedDisc;
+                    const isLocked = itinerarioParentId !== undefined && studentFrenteId !== selectedDiscId;
                     const frenteBadge = itinerarioParentId && studentFrenteId
                       ? frenteNameMap.get(studentFrenteId)
                       : undefined;
+
+                    // For frente absences: use parent discipline id for attendance
+                    const absenceDiscId = hasFrentes ? selectedDisc.id : selectedDiscId;
 
                     return (
                       <tr key={s.enrollmentId} className={isLocked ? "opacity-40" : undefined}>
                         <td className="px-3 py-1.5 font-medium text-navy-800 whitespace-nowrap sticky left-0 bg-white">
                           <span>{s.name}</span>
-                          {frenteBadge && studentFrenteId !== selectedDisc && (
+                          {frenteBadge && studentFrenteId !== selectedDiscId && (
                             <span className="ml-2 text-xs text-amber-600 font-normal">({frenteBadge})</span>
                           )}
                           {itinerarioParentId && !studentFrenteId && (
                             <span className="ml-2 text-xs text-navy-400 font-normal">sem trilha</span>
                           )}
                         </td>
-                        {COLUMNS.map((c) => {
-                          const val = grades.get(`${s.enrollmentId}|${selectedDisc}|${c.period}-${c.kind}`);
-                          return (
-                            <td key={c.key} className="px-1 py-1">
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                defaultValue={val != null ? String(val) : ""}
-                                onBlur={(e) => !isLocked && onGradeBlur(s.enrollmentId, c.period, c.kind, e.target.value)}
-                                disabled={isLocked}
-                                className="w-14 rounded border border-navy-200 px-1.5 py-1 text-center text-sm focus-ring disabled:bg-navy-50 disabled:cursor-not-allowed"
-                                aria-label={`${c.label} de ${s.name}`}
-                              />
-                            </td>
-                          );
-                        })}
+                        {activeTargets.map((t) =>
+                          avaliacoesConfig.map((c) => {
+                            const val = grades.get(`${s.enrollmentId}|${t.id}|${c.id}`);
+                            return (
+                              <td key={`${t.id}-${c.id}`} className="px-1 py-1">
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  defaultValue={val != null ? String(val) : ""}
+                                  onBlur={(e) => !isLocked && onGradeBlur(s.enrollmentId, t.id, c.id, e.target.value)}
+                                  disabled={isLocked}
+                                  className="w-14 rounded border border-navy-200 px-1.5 py-1 text-center text-sm focus-ring disabled:bg-navy-50 disabled:cursor-not-allowed"
+                                  aria-label={`${c.label} de ${s.name} em ${t.name}`}
+                                />
+                              </td>
+                            );
+                          })
+                        )}
                         <td className="px-1 py-1">
                           <input
                             type="number"
                             min={0}
-                            defaultValue={absences.get(`${s.enrollmentId}|${selectedDisc}`) ?? 0}
-                            onBlur={(e) => !isLocked && onAbsenceBlur(s.enrollmentId, e.target.value)}
+                            defaultValue={absences.get(`${s.enrollmentId}|${absenceDiscId}`) ?? 0}
+                            onBlur={(e) => !isLocked && onAbsenceBlur(s.enrollmentId, absenceDiscId, e.target.value)}
                             disabled={isLocked}
                             className="w-14 rounded border border-navy-200 px-1.5 py-1 text-center text-sm focus-ring disabled:bg-navy-50 disabled:cursor-not-allowed"
                             aria-label={`Faltas de ${s.name}`}
