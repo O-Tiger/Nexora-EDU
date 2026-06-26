@@ -32,8 +32,16 @@ function periodLabel(i: number, periodos: number): string {
   return `${i}º Trim.`;
 }
 
-/** Consolida as frentes na disciplina-mãe, fazendo a média de cada célula. */
-function consolidateRows(rows: BoletimDisciplinaRow[], periodos: number): BoletimDisciplinaRow[] {
+/**
+ * Consolida as frentes na disciplina-mãe, fazendo a média de cada célula.
+ * Se a mãe não está nas linhas (frentes órfãs), cria uma linha sintética
+ * com o nome da mãe (buscado em disciplinaNames) e a média das frentes.
+ */
+function consolidateRows(
+  rows: BoletimDisciplinaRow[],
+  periodos: number,
+  disciplinaNames: Map<string, string> = new Map(),
+): BoletimDisciplinaRow[] {
   const keys = gradeKeys(periodos);
   const byId = new Set(rows.map((r) => r.disciplinaId));
   const frentesByParent = new Map<string, BoletimDisciplinaRow[]>();
@@ -45,24 +53,46 @@ function consolidateRows(rows: BoletimDisciplinaRow[], periodos: number): Boleti
     }
   }
 
-  const result: BoletimDisciplinaRow[] = [];
-  for (const r of rows) {
-    if (r.isFrente) continue;
-    const frentes = frentesByParent.get(r.disciplinaId) ?? [];
-    if (frentes.length === 0) { result.push(r); continue; }
-
-    const sources = [r, ...frentes];
+  function avgRows(sources: BoletimDisciplinaRow[]): Record<string, number | null> {
     const grades: Record<string, number | null> = {};
     for (const k of keys) {
       const vals = sources.map((s) => s.grades[k]).filter((v): v is number => typeof v === "number");
       grades[k] = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 100) / 100 : null;
     }
-    const absences = sources.reduce((a, s) => a + s.absences, 0);
-    result.push({ ...r, grades, absences, isFrente: false });
+    return grades;
   }
+
+  const result: BoletimDisciplinaRow[] = [];
+
+  // Non-frente rows: consolidate any frentes that have this row as parent
   for (const r of rows) {
-    if (r.isFrente && !(r.parentId && byId.has(r.parentId))) result.push(r);
+    if (r.isFrente) continue;
+    const frentes = frentesByParent.get(r.disciplinaId) ?? [];
+    if (frentes.length === 0) { result.push(r); continue; }
+    const sources = [r, ...frentes];
+    result.push({ ...r, grades: avgRows(sources), absences: sources.reduce((a, s) => a + s.absences, 0), isFrente: false });
   }
+
+  // Orphan frentes: group by parentId → one synthetic parent row per group
+  const orphansByParent = new Map<string, BoletimDisciplinaRow[]>();
+  for (const r of rows) {
+    if (r.isFrente && r.parentId && !byId.has(r.parentId)) {
+      const arr = orphansByParent.get(r.parentId) ?? [];
+      arr.push(r);
+      orphansByParent.set(r.parentId, arr);
+    }
+  }
+  for (const [parentId, frentes] of orphansByParent) {
+    result.push({
+      disciplinaId: parentId,
+      name: disciplinaNames.get(parentId) ?? frentes[0]!.name,
+      isFrente: false,
+      parentId: null,
+      grades: avgRows(frentes),
+      absences: frentes.reduce((a, f) => a + f.absences, 0),
+    });
+  }
+
   return result;
 }
 
@@ -129,7 +159,8 @@ function gradeCell(v: number | null, extraClass = ""): string {
 }
 
 function studentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes, periodos: number): string {
-  const rows = frentes === "media" ? consolidateRows(student.rows, periodos) : student.rows;
+  const disciplinaNames = new Map(data.disciplinaOrder.map((d) => [d.id, d.name]));
+  const rows = frentes === "media" ? consolidateRows(student.rows, periodos, disciplinaNames) : student.rows;
   const totalAbsences = rows.reduce((sum, r) => sum + r.absences, 0);
   const freqPct = Math.max(0, Math.round((1 - totalAbsences / DIAS_LETIVOS) * 100));
   const media = overallMedia(rows, periodos);
@@ -292,7 +323,8 @@ function cccGradeCell(v: number | null): string {
 }
 
 function cccStudentCard(student: BoletimStudent, data: BoletimData, school: SchoolHeader, frentes: BoletimFrentes, periodos: number): string {
-  const rows = frentes === "media" ? consolidateRows(student.rows, periodos) : student.rows;
+  const disciplinaNames = new Map(data.disciplinaOrder.map((d) => [d.id, d.name]));
+  const rows = frentes === "media" ? consolidateRows(student.rows, periodos, disciplinaNames) : student.rows;
 
   // Per-period effective AVA: max(ava, per-period recp) if recp entered
   function effectiveAva(grades: Record<string, number | null>, i: number): number | null {
