@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@nexora/auth";
 import { getBoletimData } from "@nexora/db/src/queries/pedagogico";
-import { buildBoletimHtml, renderBoletim, type BoletimFormat, type BoletimFrentes } from "@/lib/boletim";
+import { buildBoletimHtml, buildBoletimHtmlCCC, renderBoletim, type BoletimFormat, type BoletimFrentes, type BoletimTemplate } from "@/lib/boletim";
 import { createAuditLog } from "@nexora/db/src/queries/audit";
 import { getTenantConfig } from "@nexora/db/src/queries/administracao";
 import { BRAND } from "@nexora/ui";
@@ -29,6 +29,7 @@ export async function GET(req: Request) {
   const enrollmentId = url.searchParams.get("enrollmentId") ?? undefined;
   const format = (url.searchParams.get("format") ?? "pdf") as BoletimFormat;
   const frentes = (url.searchParams.get("frentes") === "media" ? "media" : "avulsas") as BoletimFrentes;
+  const template = (url.searchParams.get("template") === "ccc" ? "ccc" : "padrao") as BoletimTemplate;
 
   if (!turmaId) return NextResponse.json({ error: "turmaId obrigatório" }, { status: 400 });
   if (!FORMATS.includes(format)) return NextResponse.json({ error: "Formato inválido" }, { status: 400 });
@@ -43,12 +44,15 @@ export async function GET(req: Request) {
   }
 
   const periodos = tenantConfig?.periodos ?? 3;
-  const html = buildBoletimHtml(data, {
+  const schoolHeader = {
     name: tenantConfig?.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || BRAND.name,
     ...(tenantConfig?.cnpj && { cnpj: tenantConfig.cnpj }),
     ...(tenantConfig?.schoolAddress && { address: tenantConfig.schoolAddress }),
     ...(tenantConfig?.logoUrl && { logoUrl: tenantConfig.logoUrl }),
-  }, frentes, periodos);
+  };
+  const html = template === "ccc"
+    ? buildBoletimHtmlCCC(data, schoolHeader, frentes, periodos)
+    : buildBoletimHtml(data, schoolHeader, frentes, periodos);
 
   let rendered;
   try {

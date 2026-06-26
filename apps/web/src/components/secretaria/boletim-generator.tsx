@@ -6,6 +6,7 @@ import { FileText, Download, Eye, Users, X } from "lucide-react";
 
 type Format = "pdf" | "html" | "doc";
 type Frentes = "avulsas" | "media";
+type Template = "padrao" | "ccc";
 
 interface Student { enrollmentId: string; name: string }
 
@@ -26,13 +27,19 @@ const FRENTES_OPTS: { value: Frentes; label: string; hint: string }[] = [
   { value: "media", label: "Média das frentes", hint: "Consolida as frentes na disciplina" },
 ];
 
+const TEMPLATE_OPTS: { value: Template; label: string; hint: string }[] = [
+  { value: "padrao", label: "Padrão", hint: "Layout genérico Nexora" },
+  { value: "ccc", label: "CCC", hint: "Layout Colégio Caminhos e Colinas" },
+];
+
 export function BoletimGenerator({ turmaId, students }: Props) {
   const [format, setFormat] = useState<Format>("pdf");
   const [frentes, setFrentes] = useState<Frentes>("avulsas");
+  const [template, setTemplate] = useState<Template>("padrao");
   const [preview, setPreview] = useState<{ enrollmentId?: string; label: string } | null>(null);
 
   function url(fmt: Format, enrollmentId?: string) {
-    const p = new URLSearchParams({ turmaId, format: fmt, frentes });
+    const p = new URLSearchParams({ turmaId, format: fmt, frentes, template });
     if (enrollmentId) p.set("enrollmentId", enrollmentId);
     return `/api/secretaria/boletim?${p.toString()}`;
   }
@@ -81,6 +88,24 @@ export function BoletimGenerator({ turmaId, students }: Props) {
                 onClick={() => setFrentes(o.value)}
                 title={o.hint}
                 className={o.value === frentes
+                  ? "rounded-md bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700"
+                  : "rounded-md px-3 py-1.5 text-sm text-navy-500 hover:bg-navy-50"}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-navy-500">Template:</span>
+          <div className="flex gap-1">
+            {TEMPLATE_OPTS.map((o) => (
+              <button
+                key={o.value}
+                onClick={() => setTemplate(o.value)}
+                title={o.hint}
+                className={o.value === template
                   ? "rounded-md bg-teal-50 px-3 py-1.5 text-sm font-medium text-teal-700"
                   : "rounded-md px-3 py-1.5 text-sm text-navy-500 hover:bg-navy-50"}
               >

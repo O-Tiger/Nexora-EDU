@@ -24,14 +24,26 @@ interface Props {
   canManageDisciplinas?: boolean;
   /** 2 = semestral, 3 = trimestral, 4 = bimestral */
   periodos?: number;
+  /** Quando true, mostra coluna de Recuperação por período (layout CCC) */
+  recpPerPeriod?: boolean;
   /** frenteId → parentId, only for frentes of isItinerario parents */
   itinerarioFrenteOf?: Record<string, string>;
   /** enrollment frente assignments for itinerário disciplines */
   enrollmentFrentes?: EnrollmentFrenteRow[];
 }
 
-function buildColumns(periodos: number): { key: string; label: string; period: number; kind: GradeKind }[] {
+function buildColumns(periodos: number, recpPerPeriod: boolean): { key: string; label: string; period: number; kind: GradeKind }[] {
   const ordinals = ["1ª", "2ª", "3ª", "4ª"];
+  if (recpPerPeriod) {
+    // CCC mode: [AVA T1, REC T1, AVA T2, REC T2, ...] + Recuper. Final
+    const cols: { key: string; label: string; period: number; kind: GradeKind }[] = [];
+    for (let i = 0; i < periodos; i++) {
+      cols.push({ key: `${i + 1}-AVA`, label: `${ordinals[i]} Méd.`, period: i + 1, kind: "AVA" });
+      cols.push({ key: `${i + 1}-RECP`, label: `${ordinals[i]} Rec.`, period: i + 1, kind: "RECP" });
+    }
+    cols.push({ key: "0-RECP", label: "Rec. Final", period: 0, kind: "RECP" });
+    return cols;
+  }
   const ava = Array.from({ length: periodos }, (_, i) => ({
     key: `${i + 1}-AVA`,
     label: `${ordinals[i]} AVA`,
@@ -47,9 +59,9 @@ function buildColumns(periodos: number): { key: string; label: string; period: n
 
 export function NotasGrid(props: Props) {
   const { turmaId, students, allDisciplinas, assignedDisciplinas, canManageDisciplinas = true,
-    periodos = 3, itinerarioFrenteOf = {}, enrollmentFrentes = [] } = props;
+    periodos = 3, recpPerPeriod = false, itinerarioFrenteOf = {}, enrollmentFrentes = [] } = props;
 
-  const COLUMNS = useMemo(() => buildColumns(periodos), [periodos]);
+  const COLUMNS = useMemo(() => buildColumns(periodos, recpPerPeriod), [periodos, recpPerPeriod]);
 
   // Map `${enrollmentId}|${parentId}` → frenteId for itinerário lookup
   const efMap = new Map<string, string>();
