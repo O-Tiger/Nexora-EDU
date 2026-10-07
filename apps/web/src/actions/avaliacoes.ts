@@ -18,7 +18,7 @@ async function requireAdmin() {
 }
 
 const AvaliacaoSchema = z.object({
-  id: z.string().cuid().optional(),
+  id: z.string().min(1).optional(),
   sigla: z.string().min(1).max(20),
   label: z.string().min(1).max(100),
   periodo: z.coerce.number().int().min(0).max(10),

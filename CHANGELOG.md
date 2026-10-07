@@ -11,6 +11,7 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ### Fixed
 - `notas` (secretaria e professor): disciplina pai não aparece mais duplicada quando já tem frentes atribuídas
+- `avaliacoes`: validação do `id` aceita qualquer string não vazia (antes exigia o formato cuid)
 
 ### Changed (Fase 3 — Professores como cadastro interno)
 - `packages/db`: novo model `Professor` (nome, email/telefone opcionais, sem login/senha); `TurmaDisciplina.professorId` re-aponta de `User` para `Professor` + migration
