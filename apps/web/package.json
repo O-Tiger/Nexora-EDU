@@ -31,7 +31,7 @@
     "mathjs": "^15.2.0",
     "next": "^15.3.3",
     "next-intl": "^4.13.0",
-    "puppeteer": "^22.0.0",
+    "puppeteer": "^25.12.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "xml2js": "^0.6.0"

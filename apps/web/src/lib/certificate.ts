@@ -162,7 +162,7 @@ export async function generateCertificatePdf(
 
   try {
     const page = await browser.newPage();
-    await page.setContent(buildCertificateHtml(data, template), { waitUntil: "networkidle0" });
+    await page.setContent(buildCertificateHtml(data, template), { waitUntil: "load" });
     await page.setViewport({ width: 1123, height: 794 });
 
     const pdfBuffer = await page.pdf({

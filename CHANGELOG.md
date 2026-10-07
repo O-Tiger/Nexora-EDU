@@ -9,6 +9,10 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 
 ## [Unreleased]
 
+### Changed (infra)
+- Node.js mínimo passa de 20 para **22.12** (`engines`, CI e docs): o Node 20 saiu de suporte e o `puppeteer` 25 exige >= 22.12
+- `puppeteer` 22 → 25 (`apps/web`): corrige a cadeia de advisories de `@puppeteer/browsers`, `extract-zip`, `proxy-agent` e `basic-ftp`
+
 ### Changed (Fase 3 — Professores como cadastro interno)
 - `packages/db`: novo model `Professor` (nome, email/telefone opcionais, sem login/senha); `TurmaDisciplina.professorId` re-aponta de `User` para `Professor` + migration
 - Professores agora são **cadastrados/excluídos por admins** (ADMIN/SUPER_ADMIN/COORDENADOR) em `/admin/secretaria/professores` — não se auto-cadastram e não autenticam
