@@ -44,7 +44,7 @@ export default async function ProfNotasPage({ params }: { params: Promise<{ id: 
 
   // Prof: frentes already individually assigned — group them by parentId
   const frentesByParent = new Map<string, { id: string; name: string }[]>();
-  const standaloneDiscs: { id: string; name: string }[] = [];
+  const standaloneDiscsMap = new Map<string, { id: string; name: string }>();
   for (const v of myVinculos) {
     const d = v.disciplina;
     if (d.parentId) {
@@ -52,9 +52,11 @@ export default async function ProfNotasPage({ params }: { params: Promise<{ id: 
       arr.push({ id: d.id, name: d.name });
       frentesByParent.set(d.parentId, arr);
     } else {
-      standaloneDiscs.push({ id: d.id, name: d.name });
+      standaloneDiscsMap.set(d.id, { id: d.id, name: d.name });
     }
   }
+  // Remove standalone entries whose id is already a parent key (has frentes assigned)
+  const standaloneDiscs = [...standaloneDiscsMap.values()].filter((d) => !frentesByParent.has(d.id));
   const discWithFrentes = [
     ...[...frentesByParent.entries()].map(([parentId, frentes]) => ({
       id: parentId,

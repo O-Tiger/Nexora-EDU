@@ -90,8 +90,8 @@ export default async function NotasPage({ params }: { params: Promise<{ id: stri
         frentes: (frentesByParent.get(parentId) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
       };
     }),
-    // Non-frente disciplines assigned directly
-    ...assigned.filter((d) => !d.parentId).map((d) => ({ id: d.id, name: d.name, frentes: [] as { id: string; name: string }[] })),
+    // Non-frente disciplines assigned directly (exclude parents already represented above)
+    ...assigned.filter((d) => !d.parentId && !assignedParentIds.has(d.id)).map((d) => ({ id: d.id, name: d.name, frentes: [] as { id: string; name: string }[] })),
   ].sort((a, b) => a.name.localeCompare(b.name));
 
   const students = turma.enrollments.map((e) => ({ enrollmentId: e.id, name: e.student.name }));
