@@ -28,5 +28,8 @@
   },
   "dependencies": {
     "recharts": "^3.8.1"
+  },
+  "overrides": {
+    "prismjs": "^1.30.0"
   }
 }
