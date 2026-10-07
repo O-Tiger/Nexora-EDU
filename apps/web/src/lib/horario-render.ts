@@ -144,7 +144,7 @@ export async function renderHorario(html: string, format: HorarioFormat): Promis
   });
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "load" });
     const pdf = await page.pdf({ format: "A4", landscape: true, printBackground: true, margin: { top: "8mm", bottom: "8mm", left: "8mm", right: "8mm" } });
     return { buffer: Buffer.from(pdf), contentType: "application/pdf", ext: "pdf" };
   } finally {
