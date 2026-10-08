@@ -104,7 +104,6 @@ Documentação completa de setup: [docs/setup/local-development.md](docs/setup/l
 | [Arquitetura](docs/architecture/overview.md) | Visão geral do sistema |
 | [Modelo de dados](docs/architecture/data-model.md) | Schema Prisma e relações |
 | [Autenticação](docs/architecture/auth.md) | JWT, roles, multi-tenant |
-| [Deploy — Railway](docs/deploy/railway.md) | Deploy e variáveis de produção |
 | [Release workflow](docs/deploy/release-workflow.md) | SemVer, tags, CHANGELOG |
 | [Boletim](docs/features/boletim.md) | Engine de geração de boletim |
 | [Grade de horários](docs/features/horario.md) | Configuração e PDF |
