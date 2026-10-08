@@ -37,7 +37,7 @@ export async function upsertAvaliacaoConfig(
 ) {
   if (data.id) {
     return prisma.avaliacaoConfig.update({
-      where: { id: data.id },
+      where: { id: data.id, tenantId },
       data: {
         sigla: data.sigla,
         label: data.label,
