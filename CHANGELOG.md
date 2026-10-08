@@ -12,6 +12,7 @@ Versionamento segue [SemVer](https://semver.org/lang/pt-BR/).
 ### Fixed
 - `notas` (secretaria e professor): disciplina pai não aparece mais duplicada quando já tem frentes atribuídas
 - `avaliacoes`: o `id` volta a ser validado (cuid ou UUID das configs padrão semeadas pela migration), inclusive na exclusão
+- `avaliacoes` (segurança): a atualização agora é restrita ao tenant da sessão (`where: { id, tenantId }`); antes um admin de outro tenant que soubesse o id podia editar a avaliação
 
 ### Changed (infra)
 - Node.js mínimo passa de 20 para **22.12** (`engines`, CI e docs): o Node 20 saiu de suporte e o `puppeteer` 25 exige >= 22.12
