@@ -6,7 +6,7 @@ Este guia é para quem quer rodar o Nexora EDU localmente ou fazer deploy em pro
 
 ## Requisitos
 
-- Node.js 20 ou superior
+- Node.js 22.12 ou superior
 - npm 10 ou superior
 - Docker Desktop
 - Git

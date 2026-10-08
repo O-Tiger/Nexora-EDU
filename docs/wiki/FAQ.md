@@ -13,7 +13,7 @@ Sim, para uso interno (sua própria instituição). Hospedar como serviço para 
 ## Configuração e Deploy
 
 **Quais são os requisitos mínimos para rodar em produção?**
-- Node.js 20+
+- Node.js 22.12+
 - PostgreSQL 16+
 - Redis (Upstash ou qualquer Redis compatível)
 
