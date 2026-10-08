@@ -171,6 +171,7 @@ const ConfigSchema = z.object({
   cnpj:          z.string().max(20).optional(),
   emailDomain:   z.string().max(100).optional(),
   emailTemplate: z.string().max(200).optional(),
+  periodos:      z.coerce.number().int().refine((v) => [2, 3, 4].includes(v)).optional(),
 });
 
 export async function salvarConfigAction(fd: FormData) {
@@ -185,6 +186,7 @@ export async function salvarConfigAction(fd: FormData) {
     cnpj:          data.cnpj          || null,
     emailDomain:   data.emailDomain   || null,
     emailTemplate: data.emailTemplate || null,
+    ...(data.periodos != null && { periodos: data.periodos }),
   });
   revalidatePath("/admin/administracao/configuracoes");
   return { success: true };

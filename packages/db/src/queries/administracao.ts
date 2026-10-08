@@ -43,6 +43,7 @@ export async function upsertTenantConfig(
     logoUrl?: string | null;
     emailDomain?: string | null;
     emailTemplate?: string | null;
+    periodos?: number;
   },
 ) {
   return prisma.tenantConfig.upsert({

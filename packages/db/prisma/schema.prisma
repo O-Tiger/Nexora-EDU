@@ -911,33 +911,66 @@ model Professor {
 }
 
 /// Nota de um aluno numa disciplina, por período (trimestre) e tipo de avaliação.
-model Grade {
-  id           String    @id @default(cuid())
-  tenantId     String
-  enrollmentId String
-  disciplinaId String
-  /// 1, 2, 3 = trimestre; usado com kind para localizar a célula do boletim
-  period       Int
-  kind         GradeKind
-  score        Float?
-  updatedAt    DateTime  @updatedAt
-  updatedBy    String
+model AvaliacaoConfig {
+  id          String        @id @default(cuid())
+  tenantId    String
+  /// Sigla curta exibida no grid de notas, ex: "AV1", "TI", "REC"
+  sigla       String        @db.VarChar(20)
+  /// Rótulo completo, ex: "1ª Avaliação Trimestral"
+  label       String        @db.VarChar(100)
+  /// 1-4 = período letivo; 0 = global (recuperação final / prova final)
+  periodo     Int
+  /// true = é uma recuperação (influência: eleva a nota do período se maior)
+  isRecuperacao Boolean     @default(false)
+  tipo        TipoAvaliacao
+  /// Peso para média ponderada; null = peso igual a 1
+  peso        Float?
+  obrigatoria Boolean       @default(true)
+  /// Ordem de exibição no grid (menor = mais à esquerda)
+  ordem       Int
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
-  enrollment TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  disciplina Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  grades Grade[]
 
-  @@unique([enrollmentId, disciplinaId, period, kind])
-  @@index([tenantId, enrollmentId])
-  @@index([disciplinaId])
+  @@unique([tenantId, sigla])
+  @@index([tenantId, periodo])
+  @@index([tenantId, ordem])
 }
 
-enum GradeKind {
-  /// Avaliação do trimestre
-  AVA
-  /// Recuperação do trimestre
-  RECP
-  /// Prova final
-  FINAL
+enum TipoAvaliacao {
+  /// Nota numérica 0–10
+  NOTA
+  /// Soma de pontos (exibida como pontos, não normalizada para 0–10 no cálculo)
+  SOMA
+  /// Média calculada a partir de sub-avaliações (ou lançada diretamente)
+  MEDIA
+  /// Conceito: A / B / C / D / E
+  CONCEITO
+  /// Não influencia a média final (ex: participação, portfólio opcional)
+  SEM_INFLUENCIA
+}
+
+model Grade {
+  id                String          @id @default(cuid())
+  tenantId          String
+  enrollmentId      String
+  disciplinaId      String
+  avaliacaoConfigId String
+  score             Float?
+  /// Valor conceitual (A/B/C/D/E) — usado quando tipo = CONCEITO
+  conceito          String?         @db.VarChar(2)
+  updatedAt         DateTime        @updatedAt
+  updatedBy         String
+
+  enrollment      TurmaEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  disciplina      Disciplina      @relation(fields: [disciplinaId], references: [id], onDelete: Cascade)
+  avaliacaoConfig AvaliacaoConfig @relation(fields: [avaliacaoConfigId], references: [id], onDelete: Cascade)
+
+  @@unique([enrollmentId, disciplinaId, avaliacaoConfigId])
+  @@index([tenantId, enrollmentId])
+  @@index([tenantId, disciplinaId])
+  @@index([avaliacaoConfigId])
 }
 
 /// Frequência: faltas acumuladas de um aluno numa disciplina.
@@ -1208,6 +1241,9 @@ model TenantConfig {
   /// Template da parte local do email — placeholders: {primeiroNome}, {primeiroSobrenome}, {nomeCompleto}
   /// Exemplo: "{primeiroNome}.{primeiroSobrenome}"
   emailTemplate String?
+
+  /// Sistema de avaliação: 2 = semestral, 3 = trimestral, 4 = bimestral
+  periodos      Int     @default(3)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -10,7 +10,6 @@ import {
   updateDisciplinaColor, setTurmaDisciplinaProfessor, setMateriaColors,
   updateDisciplinaItinerario, setEnrollmentFrente, removeEnrollmentFrente,
 } from "@nexora/db/src/queries/pedagogico";
-import type { GradeKind } from "@nexora/db";
 
 async function requireStaff() {
   const session = await auth();
@@ -91,16 +90,14 @@ export async function setTurmaDisciplinasAction(turmaId: string, disciplinaIds: 
 const GradeSchema = z.object({
   enrollmentId: z.string().cuid(),
   disciplinaId: z.string().cuid(),
-  period: z.number().int().min(0).max(3),
-  kind: z.enum(["AVA", "RECP", "FINAL"]),
+  avaliacaoConfigId: z.string().cuid(),
   score: z.number().min(0).max(10).nullable(),
 });
 
 export async function saveGradeAction(input: {
   enrollmentId: string;
   disciplinaId: string;
-  period: number;
-  kind: GradeKind;
+  avaliacaoConfigId: string;
   score: number | null;
 }) {
   const { tenantId, userId } = await requireStaff();
