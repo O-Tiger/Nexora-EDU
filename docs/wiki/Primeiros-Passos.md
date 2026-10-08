@@ -83,7 +83,7 @@ Para configurar do zero:
 
 1. Crie um projeto no Railway
 2. Adicione os plugins **PostgreSQL** e **Upstash Redis**
-3. Configure as variáveis de ambiente (veja [documentação completa](https://github.com/O-Tiger/Nexora-EDU/blob/main/docs/deploy/railway.md))
+3. Configure as variáveis de ambiente (veja [Variáveis de ambiente](../setup/environment-variables.md))
 4. Conecte o repositório GitHub — o Railway detecta automaticamente o Next.js
 
 ---
