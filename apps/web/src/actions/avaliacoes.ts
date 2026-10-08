@@ -17,8 +17,16 @@ async function requireAdmin() {
   return { tenantId: activeTenantId, userId: id };
 }
 
+// Two id shapes exist: Prisma cuid() for rows created in the app, and UUIDs for the default
+// configs seeded by the 20260626000000_add_avaliacao_config migration (gen_random_uuid()).
+const ID_ERROR = "ID de avaliação inválido.";
+const AvaliacaoId = z.union(
+  [z.string().max(40, ID_ERROR).cuid(ID_ERROR), z.string().uuid(ID_ERROR)],
+  { errorMap: () => ({ message: ID_ERROR }) },
+);
+
 const AvaliacaoSchema = z.object({
-  id: z.string().min(1).optional(),
+  id: AvaliacaoId.optional(),
   sigla: z.string().min(1).max(20),
   label: z.string().min(1).max(100),
   periodo: z.coerce.number().int().min(0).max(10),
@@ -47,8 +55,11 @@ export async function saveAvaliacaoConfigAction(input: unknown) {
 
 export async function deleteAvaliacaoConfigAction(id: string) {
   const { tenantId } = await requireAdmin();
+  const parsedId = AvaliacaoId.safeParse(id);
+  if (!parsedId.success) return { error: ID_ERROR };
+
   try {
-    await deleteAvaliacaoConfig(id, tenantId);
+    await deleteAvaliacaoConfig(parsedId.data, tenantId);
     revalidatePath("/admin/secretaria/avaliacoes");
     return { success: true };
   } catch (e) {
