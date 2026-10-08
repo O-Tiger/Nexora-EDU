@@ -535,7 +535,7 @@ export async function renderBoletim(
   });
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "load" });
     const pdf = await page.pdf({ format: "A4", printBackground: true, margin: { top: "10mm", bottom: "10mm", left: "8mm", right: "8mm" } });
     return { buffer: Buffer.from(pdf), contentType: "application/pdf", ext: "pdf" };
   } finally {
